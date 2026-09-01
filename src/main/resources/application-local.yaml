@@ -1,0 +1,44 @@
+spring:
+  config:
+    activate:
+      on-profile: local
+  datasource:
+    driver-class-name: org.postgresql.Driver
+    url: jdbc:postgresql://localhost:5432/testdb?currentSchema=public&reWriteBatchedInserts=true
+    username: postgres
+    password: root
+  flyway:
+    enabled: false
+    baseline-on-migrate: true
+  jpa:
+    hibernate:
+      # 量产阶段使用flyway 关闭 ddl-auto 改为validate
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+  threads:
+    virtual:
+      enabled: true
+wx:
+  miniapp:
+    appid: wx1234567890abcdef      # 你的小程序 AppID
+    secret: your_app_secret_here    # 你的小程序 AppSecret
+    # 自动将 AccessToken 等凭证缓存在 Redis 中 (多实例集群部署必备)
+#    config-storage:
+#      type: redis
+#      redis:
+#        host: 127.0.0.1
+#        port: 6379
+htz:
+  security:
+    public-key: |-
+      MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAtkP9EI/kOl4OE9wOgeMO
+      ryZOpPFeIf/D4xOke397ytnvIe5vMdJva0+mu3N3uct7/MNbuaeJ+sfXtq97dcub
+      uou6P6fWpLdfV36Z+ZfZW+7c/1N8t5m0eU/5u7S8f/30q5hO0l1l9u8g8a3/4u4i
+      6z5g7m9r0q2w5e8r1t4y7u+i/o8p/a0s3d6f9g0h3j6k9l2z5x8c1v4b7n0m3q6w
+      9e2r5t8y1u4i7o+p/a0s3d6f9g0h3j6k9l2z5x8c1v4b7n0m3q6w9e2r5t8y1u4i
+      7o+p/a0s3d6f9g0h3j6k9l2z5x8c1v4b7n0m3q6w9e2r5t8y1u4i7o+p/a0s3d6f
+      9gIDAQAB
+    private-key: ${privateKey}
