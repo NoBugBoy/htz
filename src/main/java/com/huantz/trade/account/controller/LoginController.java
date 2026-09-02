@@ -25,15 +25,11 @@ public class LoginController {
   public sealed interface Login {
     record AccessToken(String token) implements Login {}
 
-    record LoginRequest(
-        @NotBlank(message = "loginCode 不能为空") String loginCode,
-        @NotBlank(message = "phoneCode 不能为空") String phoneCode)
-        implements Login {}
+    record LoginRequest(@NotBlank(message = "loginCode 不能为空") String loginCode) implements Login {}
   }
 
   @PostMapping("/login")
   public AccessToken login(@Validated @RequestBody LoginRequest request) {
-    return new AccessToken(
-        loginUseCase.execute(new LoginCommand(request.loginCode, request.phoneCode)));
+    return new AccessToken(loginUseCase.execute(new LoginCommand(request.loginCode)));
   }
 }

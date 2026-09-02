@@ -32,13 +32,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     if (StringUtils.hasText(header) && header.startsWith("Bearer ")) {
       String token = header.substring(7);
 
-      if (JwtUtils.parseAndVerifyToken(token, properties.security().getPublicKey())
-          instanceof Long userId) {
-        // 2. 从 Token 解析出用户信息 (比如 userId, role)
-        //        var authorities = roles.stream().map(SimpleGrantedAuthority::new).toList();
-        // 3. 👈 核心：手动给当前请求盖章认证！
-        SecurityHolder.setAuthentication(userId);
-      }
+      Long userId =
+          JwtUtils.parseAndVerifyToken(
+              token, properties.security().getPublicKey()); // 2. 从 Token 解析出用户信息 (比如 userId, role)
+      //        var authorities = roles.stream().map(SimpleGrantedAuthority::new).toList();
+      // 3. 👈 核心：手动给当前请求盖章认证！
+      SecurityHolder.setAuthentication(userId);
     }
 
     // 4. 放行给后面的 Filter 和 Controller

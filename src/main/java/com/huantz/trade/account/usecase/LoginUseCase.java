@@ -2,8 +2,6 @@ package com.huantz.trade.account.usecase;
 
 import cn.binarywang.wx.miniapp.api.WxMaService;
 import cn.binarywang.wx.miniapp.bean.WxMaPhoneNumberInfo;
-import cn.hutool.core.util.DesensitizedUtil;
-import com.huantz.trade.account.model.dto.Phone;
 import com.huantz.trade.account.model.entity.UserEntity;
 import com.huantz.trade.account.service.UserCommandService;
 import com.huantz.trade.account.service.UserQueryService;
@@ -19,8 +17,6 @@ import lombok.extern.slf4j.Slf4j;
 import me.chanjar.weixin.common.error.WxErrorException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.ObjectUtils;
-import org.springframework.util.StringUtils;
 
 /**
  * @author yujian
@@ -34,14 +30,12 @@ public class LoginUseCase implements UseCase<LoginCommand, String> {
   private final WxMaService wxMaService;
   private final CustomerProperties customerProperties;
 
-  public record LoginCommand(String loginCode, String phoneCode) {}
+  public record LoginCommand(String loginCode) {}
 
   @Transactional(rollbackFor = Throwable.class)
   @Override
   public String execute(LoginCommand loginCommand) {
     final var loginCode = loginCommand.loginCode();
-    final var registerCode = loginCommand.phoneCode();
-    var user = Optional.<UserEntity>empty();
     String openid, unionId;
     WxMaPhoneNumberInfo phoneInfo = null;
 
@@ -55,15 +49,15 @@ public class LoginUseCase implements UseCase<LoginCommand, String> {
       throw handleWxException(e, "登录异常,请稍后重试");
     }
 
-    if (StringUtils.hasText(registerCode)
-        && ObjectUtils.isEmpty(user = userQueryService.isFirstLogin(openid))) {
-      try {
-        phoneInfo = wxMaService.getUserService().getPhoneNoInfo(registerCode);
-      } catch (WxErrorException e) {
-        log.error("微信 code2phoneInfo 调用失败, registerCode: {}", registerCode, e);
-        throw handleWxException(e, "获取手机号失败");
-      }
-    }
+    var user = userQueryService.isFirstLogin(openid);
+    //    if (StringUtils.hasText(registerCode) && ObjectUtils.isEmpty(user)) {
+    //      try {
+    //        phoneInfo = wxMaService.getUserService().getPhoneNoInfo(registerCode);
+    //      } catch (WxErrorException e) {
+    //        log.error("微信 code2phoneInfo 调用失败, registerCode: {}", registerCode, e);
+    //        throw handleWxException(e, "获取手机号失败");
+    //      }
+    //    }
     return doRegisterAndLogin(user, openid, unionId, phoneInfo);
   }
 
@@ -72,16 +66,8 @@ public class LoginUseCase implements UseCase<LoginCommand, String> {
     var userId =
         user.orElseGet(
                 () -> {
-                  log.info(
-                      "首次登录，开始注册 openId = {} phone = {}",
-                      openid,
-                      DesensitizedUtil.mobilePhone(phone.getPhoneNumber()));
-                  return userCommandService.register(
-                      new UserRegister(
-                          openid,
-                          unionId,
-                          new Phone(phone.getPhoneNumber(), phone.getCountryCode(), false),
-                          null));
+                  log.info("首次登录，开始注册 openId = {} ", openid);
+                  return userCommandService.register(new UserRegister(openid, unionId, null, null));
                 })
             .getId();
     log.info(">>> userId = {} 登录", userId);
