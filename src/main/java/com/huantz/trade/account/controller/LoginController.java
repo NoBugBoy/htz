@@ -1,7 +1,6 @@
 package com.huantz.trade.account.controller;
 
-import com.huantz.trade.account.controller.LoginController.Login.AccessToken;
-import com.huantz.trade.account.controller.LoginController.Login.LoginRequest;
+import com.huantz.trade.account.model.response.AccessToken;
 import com.huantz.trade.account.usecase.LoginUseCase;
 import com.huantz.trade.account.usecase.LoginUseCase.LoginCommand;
 import jakarta.validation.constraints.NotBlank;
@@ -22,11 +21,7 @@ public class LoginController {
 
   private final LoginUseCase loginUseCase;
 
-  public sealed interface Login {
-    record AccessToken(String token) implements Login {}
-
-    record LoginRequest(@NotBlank(message = "loginCode 不能为空") String loginCode) implements Login {}
-  }
+  public record LoginRequest(@NotBlank(message = "loginCode 不能为空") String loginCode) {}
 
   @PostMapping("/login")
   public AccessToken login(@Validated @RequestBody LoginRequest request) {

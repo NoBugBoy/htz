@@ -1,9 +1,16 @@
 package com.huantz.trade.utils;
 
+import com.huantz.trade.enums.AdminRoleEnum;
+import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import java.security.PrivateKey;
 import java.security.PublicKey;
+import java.time.Duration;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
 /**
  * @author yujian
@@ -12,27 +19,57 @@ public class JwtUtils {
 
   private JwtUtils() {}
 
-  // 1. 服务端：使用私钥签名生成 Token
+  /** Token 有效期：1 小时（续期窗口逻辑与此对齐） */
+  public static final Duration TOKEN_TTL = Duration.ofHours(1);
+
+  public static String createToken(Long userId, List<AdminRoleEnum> roles, PrivateKey privateKey) {
+    return createToken(
+        userId,
+        Map.of("userId", userId, "roles", roles.stream().map(Enum::name).toList()),
+        privateKey);
+  }
+
   public static String createToken(Long userId, PrivateKey privateKey) {
+    return createToken(userId, Map.of("userId", userId), privateKey);
+  }
+
+  // 1. 服务端：使用私钥签名生成 Token
+  public static String createToken(Long userId, Map<String, Object> claims, PrivateKey privateKey) {
+    // 拷贝一份，避免修改调用方传入的 Map（调用方可能传 Map.of 等不可变 Map）
+    Map<String, Object> payload = new HashMap<>(claims);
+    Date now = new Date();
+    Date expiresAt = new Date(now.getTime() + TOKEN_TTL.toMillis());
+    // 签发时间 / 过期时间：同时放进 claims 与 builder，保证解析后 exp 单位为秒（JJWT 规范）
+    payload.put("iat", now);
+    payload.put("exp", expiresAt);
     return Jwts.builder()
         .subject(String.valueOf(userId))
-        .claim("userId", userId)
-        .claim("role", "ROLE_ADMIN")
-        .issuedAt(new Date())
-        .expiration(new Date(System.currentTimeMillis() + 3600 * 1000)) // 1小时过期
+        .claims(payload)
+        .id(UUID.randomUUID().toString()) // jti：每个 token 唯一，用于退出登录后的服务端失效
+        .issuedAt(now)
+        .expiration(expiresAt)
         .signWith(privateKey, Jwts.SIG.RS256) // 👈 核心：使用私钥签发 RS256
         .compact();
   }
 
   // 2. 下游微服务：使用公钥验签解析 Token
-  public static Long parseAndVerifyToken(String token, PublicKey publicKey) {
-    var claims =
-        Jwts.parser()
-            .verifyWith(publicKey) // 👈 核心：使用公钥验签
-            .build()
-            .parseSignedClaims(token)
-            .getPayload();
+  // 返回 Claims 而非 Map：getExpiration()/getSubject() 等标准字段可直接用，避免手工换算 exp 单位
+  public static Claims parseAndVerifyToken(String token, PublicKey publicKey) {
+    return Jwts.parser()
+        .verifyWith(publicKey) // 👈 核心：使用公钥验签
+        .build()
+        .parseSignedClaims(token)
+        .getPayload();
+  }
 
-    return Long.valueOf(claims.get("userId").toString());
+  /** 从 Authorization 头提取 Bearer Token；不是 Bearer 或无值返回 null */
+  public static String extractBearerToken(String authorizationHeader) {
+    if (authorizationHeader == null
+        || authorizationHeader.isBlank()
+        || !authorizationHeader.startsWith("Bearer ")) {
+      return null;
+    }
+    String token = authorizationHeader.substring(7).trim();
+    return token.isEmpty() ? null : token;
   }
 }

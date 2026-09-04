@@ -16,10 +16,10 @@ Content-Type: application/json
 }
 
 > {%
-  if (response.status === 200 && response.body.token) {
-    client.global.set("auth_token", response.body.token);
-    client.log("Token 已自动保存: " + response.body.token);
-  }
+    if (response.status === 200 && response.body.token) {
+        client.global.set("auth_token", response.body.token);
+        client.log("Token 已自动保存: " + response.body.token);
+    }
 %}
 
 ### 1.2 登录参数为空测试（预期返回 400 Bad Request）
@@ -33,10 +33,29 @@ Content-Type: application/json
 
 
 ### ===================================================================
-### 2. 用户模块 (User)
+### 2. 管理端认证模块 (Admin Auth)
 ### ===================================================================
 
-### 2.1 更新用户资料（需登录，自动使用上面登录获取的 Token）
+### 2.1 创建管理员 / 发送注册激活邮件
+POST {{baseUrl}}/admin/auth/create
+Content-Type: application/json
+
+{
+  "email": {
+    "email": "yujian053015@gmail.com"
+  },
+  "password": "123456"
+}
+
+### 2.2 消费 OTT 一次性链接完成管理员注册
+GET {{baseUrl}}/admin/auth/complete-register?ott=mock_ott_token_here
+
+
+### ===================================================================
+### 3. 用户模块 (User)
+### ===================================================================
+
+### 3.1 更新用户资料（需登录，自动使用上面登录获取的 Token）
 PUT {{baseUrl}}/user/update/profile
 Content-Type: application/json
 Authorization: Bearer {{authToken}}
@@ -46,7 +65,7 @@ Authorization: Bearer {{authToken}}
   "avatarUrl": "https://thirdwx.qlogo.cn/mmopen/vi_32/mock_avatar.png"
 }
 
-### 2.2 未携带 Token 访问受保护接口测试（预期返回 401 Unauthorized）
+### 3.2 未携带 Token 访问受保护接口测试（预期返回 401 Unauthorized）
 PUT {{baseUrl}}/user/update/profile
 Content-Type: application/json
 
@@ -57,11 +76,11 @@ Content-Type: application/json
 
 
 ### ===================================================================
-### 3. 系统运维 & 接口文档
+### 4. 系统运维 & 接口文档
 ### ===================================================================
 
-### 3.1 探活检查
+### 4.1 探活检查
 GET {{baseUrl}}/actuator/health
 
-### 3.2 OpenAPI v3 接口元数据
+### 4.2 OpenAPI v3 接口元数据
 GET {{baseUrl}}/v3/api-docs

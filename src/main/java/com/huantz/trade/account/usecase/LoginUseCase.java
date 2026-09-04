@@ -37,7 +37,6 @@ public class LoginUseCase implements UseCase<LoginCommand, String> {
   public String execute(LoginCommand loginCommand) {
     final var loginCode = loginCommand.loginCode();
     String openid, unionId;
-    WxMaPhoneNumberInfo phoneInfo = null;
 
     try {
       var sessionInfo = wxMaService.getUserService().getSessionInfo(loginCode);
@@ -58,7 +57,7 @@ public class LoginUseCase implements UseCase<LoginCommand, String> {
     //        throw handleWxException(e, "获取手机号失败");
     //      }
     //    }
-    return doRegisterAndLogin(user, openid, unionId, phoneInfo);
+    return doRegisterAndLogin(user, openid, unionId, null);
   }
 
   private String doRegisterAndLogin(

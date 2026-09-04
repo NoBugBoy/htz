@@ -14,13 +14,25 @@ spring:
     hibernate:
       # 量产阶段使用flyway 关闭 ddl-auto 改为validate
       ddl-auto: update
-    show-sql: false
+    show-sql: true
     properties:
       hibernate:
         format_sql: true
   threads:
     virtual:
       enabled: true
+  mail:
+    host: smtp.qq.com
+    port: 465 # SSL 端口通常为 465，TLS 为 587
+    username: 754369677@qq.com
+    password: yjxfnjndtvpqbgad
+    protocol: smtps
+    properties:
+      mail:
+        smtp:
+          auth: true
+          ssl:
+            enable: true
 wx:
   miniapp:
     appid: wx0c0e1b56a66e6e3b      # 你的小程序 AppID

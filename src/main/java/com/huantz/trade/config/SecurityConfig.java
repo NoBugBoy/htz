@@ -1,5 +1,6 @@
 package com.huantz.trade.config;
 
+import com.huantz.trade.enums.AdminRoleEnum;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import lombok.RequiredArgsConstructor;
@@ -45,13 +46,16 @@ public class SecurityConfig {
             auth ->
                 auth.requestMatchers(
                         "/auth/**", // 登录、注册、短信验证码
+                        "/admin/auth/**", // 后台管理认证
                         "/v3/api-docs/**", // OpenAPI / Swagger 文档
                         "/swagger-ui/**",
                         "/actuator/health" // 探活检查
                         )
                     .permitAll()
+                    .requestMatchers("/admin/**")
+                    .hasAnyRole(AdminRoleEnum.ADMIN.name(), AdminRoleEnum.SUPER_ADMIN.name())
                     .anyRequest()
-                    .authenticated() // 剩下的请求只需要登录凭证即可通过
+                    .authenticated() // 剩下的请
             )
 
         // 4. 统一异常响应 (401 未登录 / 403 权限不足)

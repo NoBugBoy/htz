@@ -3,6 +3,7 @@ package com.huantz.trade.account.controller;
 import com.huantz.trade.account.service.UserCommandService;
 import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -24,7 +25,8 @@ public class UserController {
       @NotBlank(message = "头像不能为空") String avatarUrl) {}
 
   @PutMapping("/update/profile")
-  public void updateProfile(@Validated @RequestBody UpdateProfileRequest request) {
+  public ResponseEntity<Void> updateProfile(@Validated @RequestBody UpdateProfileRequest request) {
     userCommandService.updateProfile(request.nickName, request.avatarUrl);
+    return ResponseEntity.noContent().build();
   }
 }
