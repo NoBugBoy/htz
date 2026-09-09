@@ -35,10 +35,10 @@ jobs:
         run: |
           pip install semgrep requests openai
 
-      # 1. 静态扫描
+      # 1. 静态代码扫描：指定只扫 src/ 目录，且加载 Java 专属代码质量与漏洞规则包
       - name: Run Semgrep Scan
         run: |
-          semgrep scan --config auto --config "p/java" --config "p/owasp-top-ten" --json -o semgrep_report.json || true
+          semgrep scan --config "p/java" --config "p/owasp-top-ten" src/ --json -o semgrep_report.json || true
 
       # 2. AI 分级处理（误报忽略、简单问题改代码、复杂问题提 Issue）
       - name: Run AI Triage & Action
