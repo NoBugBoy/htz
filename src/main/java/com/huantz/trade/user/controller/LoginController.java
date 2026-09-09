@@ -31,6 +31,7 @@ public class LoginController {
    */
   @PostMapping("/login")
   public AccessToken login(@Validated @RequestBody LoginRequest request) {
+    request = null;
     return new AccessToken(loginUseCase.execute(new LoginCommand(request.loginCode)));
   }
 }

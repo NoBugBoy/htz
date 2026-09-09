@@ -34,34 +34,35 @@ def main():
         base_url=os.environ.get("AI_BASE_URL", "https://api.openai.com/v1")
     )
 
-    system_prompt = """
-你是一名极其严格的高级代码架构师。针对 Semgrep 提供的缺陷列表，请进行分级处理：
-严格按以下 JSON 格式输出，不要包含 markdown 标记：
-{
-  "ignore_list": ["说明为什么判定为误报或不需要处理的原因..."],
-  "auto_fix_list": [
-    {
-      "file_path": "文件相对路径",
-      "issue_desc": "简短问题描述",
-      "original_snippet": "待替换的旧代码精确片段",
-      "fixed_snippet": "替换后的新代码"
-    }
-  ],
-  "need_review_list": [
-    {
-      "title": "Issue 标题",
-      "analysis": "问题危害及原因",
-      "recommended_plan": "推荐方案及示例代码",
-      "target_file": "涉及文件"
-    }
-  ]
-}
-
-判断标准：
-- ignore_list：测试类文件、配置假阳性、有框架兜底不会发生的问题。
-- auto_fix_list：纯语法级、无业务副作用、影响范围极小（如 NPE 防御、简单日志脱敏、漏加 @Transactional、简单的判空反转）。
-- need_review_list：改动影响业务流程、涉及重构、需要产品/研发确认业务语义的问题。
-"""
+    system_prompt = system_prompt = """
+                    你是一名极其严格的高级代码架构师。针对 Semgrep 提供的缺陷列表，请进行分级处理。
+                    【极其重要的语言要求】：
+                    所有输出的内容（包括 title, analysis, recommended_plan, 忽略原因等）必须【100% 严格使用通俗、专业、地道的简体中文】输出！严禁输出任何英文分析！
+                    严格按以下 JSON 格式输出，不要包含 markdown 标记：
+                    {
+                      "ignore_list": ["用中文说明为什么判定为误报或不需要处理的原因..."],
+                      "auto_fix_list": [
+                        {
+                          "file_path": "文件相对路径",
+                          "issue_desc": "简短中文问题描述",
+                          "original_snippet": "待替换的旧代码精确片段",
+                          "fixed_snippet": "替换后的新代码"
+                        }
+                      ],
+                      "need_review_list": [
+                        {
+                          "title": "简短的中文 Issue 标题（例如：GitHub 工作流中使用了未固定的 Action 版本标签）",
+                          "analysis": "用简体中文详细说明问题危害及发生原因",
+                          "recommended_plan": "用简体中文说明推荐的修复方案及示例代码",
+                          "target_file": "涉及文件路径"
+                        }
+                      ]
+                    }
+                    判断标准：
+                    - ignore_list：测试类文件、配置假阳性、有框架兜底不会发生的问题。
+                    - auto_fix_list：纯语法级、无业务副作用、影响范围极小（如 NPE 防御、简单日志脱敏、漏加 @Transactional、简单的判空反转）。
+                    - need_review_list：改动影响业务流程、涉及重构、需要产品/研发确认业务语义的问题。
+                    """
 
     resp = client.chat.completions.create(
         model="deepseek-chat" if "deepseek" in os.environ.get("AI_BASE_URL", "") else "gpt-4o",
