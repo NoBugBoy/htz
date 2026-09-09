@@ -16,6 +16,9 @@ permissions:
   pull-requests: write   # 创建 PR
   issues: write          # 创建 Issue / 评论
 
+env:
+  ACTIONS_RUNNER_FORCE_NODE24: "true"
+
 jobs:
   sonar-and-ai:
     runs-on: ubuntu-latest

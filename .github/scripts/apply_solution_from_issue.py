@@ -13,7 +13,7 @@ def run_cmd(cmd, check=False):
             raise RuntimeError(msg)
     return res.stdout.strip()
 
-def get_code_context(file_path, target_line, radius=10):
+def get_code_context(file_path, target_line, radius=20):
     if not os.path.exists(file_path):
         return ""
     try:
@@ -24,6 +24,44 @@ def get_code_context(file_path, target_line, radius=10):
         return "".join(lines[start:end])
     except Exception:
         return ""
+
+def apply_single_fix(content, orig, fixed):
+    """智能代码替换，包含精确匹配、标准化换行/首尾空格容错匹配"""
+    if not orig:
+        return content, False
+
+    # 1. 尝试直接精确匹配
+    if orig in content:
+        return content.replace(orig, fixed, 1), True
+
+    # 2. 统一转换为 \n 换行后匹配
+    orig_norm = orig.replace("\r\n", "\n")
+    content_norm = content.replace("\r\n", "\n")
+    fixed_norm = fixed.replace("\r\n", "\n")
+    if orig_norm in content_norm:
+        return content_norm.replace(orig_norm, fixed_norm, 1), True
+
+    # 3. 去除首尾空白行后尝试匹配
+    orig_strip = orig_norm.strip()
+    if orig_strip and orig_strip in content_norm:
+        return content_norm.replace(orig_strip, fixed_norm.strip(), 1), True
+
+    # 4. 如果 orig 只有单行，尝试按行两端 strip 匹配
+    orig_lines = [l.strip() for l in orig_norm.split("\n") if l.strip()]
+    if len(orig_lines) == 1:
+        single_target = orig_lines[0]
+        c_lines = content_norm.split("\n")
+        for idx, line in enumerate(c_lines):
+            if line.strip() == single_target:
+                if fixed_norm.strip():
+                    indent = line[:len(line) - len(line.lstrip())]
+                    replacement_lines = [indent + l.lstrip() if l.strip() else "" for l in fixed_norm.split("\n")]
+                    c_lines[idx:idx+1] = replacement_lines
+                else:
+                    c_lines.pop(idx)
+                return "\n".join(c_lines), True
+
+    return content, False
 
 def get_blame_author(file_path, line, repo, headers, sha_cache):
     if not os.path.exists(file_path):
@@ -156,7 +194,7 @@ def main():
             base_url=os.environ.get("AI_BASE_URL", "https://api.deepseek.com/v1")
         )
         system_prompt = """
-你是一名极其资深的 Java 架构师。针对 SonarCloud 发现的代码缺陷及其真实代码片段进行修复。
+你是一名极其资深的 Java 架构师。针对 SonarCloud 发现的代码缺陷及其真实代码片段进行精准修复。
 必须全部使用简体中文输出！
 
 严格输出以下格式的 JSON，不要包含任何 markdown 标记：
@@ -167,22 +205,27 @@ def main():
       "severity": "严重级别",
       "issue_desc": "缺陷简要说明",
       "fix_summary": "本次修复内容的一句话总结（给 PR/Issue 展示用）",
-      "original_snippet": "在 code_context 中真实存在、100%一字不差的原代码片段",
-      "fixed_snippet": "修复后的新代码"
+      "original_snippet": "待替换/删除的目标代码片段（只包含目标行，严禁包含无关周边行）",
+      "fixed_snippet": "修复后的代码（若为删除语句/死代码，直接填空字符串 \"\"）"
     }
   ],
   "skip_list": [
     {
       "file_path": "文件路径",
-      "reason": "跳过原因（如：无法精确匹配代码、有业务风险需人工确认等）"
+      "reason": "跳过原因（如：涉及重大业务逻辑必须人工决策等）"
     }
   ]
 }
 
-规则：
-- original_snippet 必须在提供的真实 code_context 中完全精确匹配！不得虚构代码！
-- 无法精确匹配或有业务风险的问题放入 skip_list 并说明原因
-- .github/ 目录下的文件一律放入 skip_list！
+【精准修复标准与核心规则】：
+1. 【空指针与明显致错代码根因修复】：
+   - 当告警提示可能存在 NullPointerException、解引用风险、或参数被重写覆盖时，请仔细观察上下文！
+   - 若发现方法形参或关键变量一进方法就被错误或恶意置为 null（如 `request = null;`、`user = null;`），这是导致后续 100% 空指针的根因致错代码，【必须直接放入 auto_fix_list 将该赋值语句整行删除】（fixed_snippet 设为 ""），恢复正常参数传递！
+2. 【无用变量与硬编码密钥】：明显的硬编码密钥占位（如 hardcodedJwtSecret）、未使用局部变量，直接整行删除。
+3. 【至关重要的替换规则】：
+   - original_snippet 必须是【最小化目标行】（通常仅 1 行），严禁包含未修改的方法声明、括号或周边行！
+   - 删除代码时：fixed_snippet 直接填空字符串 ""。
+   - .github/ 目录下的文件一律放入 skip_list！
 """
         print(f"🤖 正在调用 AI 生成修复方案（{len(fix_requests)} 条）...")
         resp = client.chat.completions.create(
@@ -213,7 +256,7 @@ def main():
         for fix in auto_fixes:
             fp    = fix["file_path"]
             orig  = fix["original_snippet"]
-            fixed = fix["fixed_snippet"]
+            fixed = fix.get("fixed_snippet", "")
             sev   = fix.get("severity", "")
             summary = fix.get("fix_summary", fix.get("issue_desc", ""))
 
@@ -222,10 +265,11 @@ def main():
                 continue
             with open(fp, "r", encoding="utf-8") as f:
                 content = f.read()
-            if orig in content:
-                content = content.replace(orig, fixed, 1)
+
+            new_content, success = apply_single_fix(content, orig, fixed)
+            if success:
                 with open(fp, "w", encoding="utf-8") as f:
-                    f.write(content)
+                    f.write(new_content)
                 modified = True
                 author     = next((r.get("blame_author") for r in fix_requests if r["file"] == fp), None)
                 author_str = f"（提交人：{author}）" if author else ""
@@ -234,7 +278,7 @@ def main():
                     pr_authors.add(author)
                 print(f"✅ 成功替换: {fp}  {author_str}")
             else:
-                print(f"⚠️ 未能精确匹配旧代码，跳过: {fp}")
+                print(f"⚠️ 未能精确匹配旧代码，跳过: {fp} -> {repr(orig)}")
 
         if not modified:
             raise ValueError("所有修复项均未能在文件中精确匹配旧代码，无法自动修复。请手动处理或重新确认问题。")

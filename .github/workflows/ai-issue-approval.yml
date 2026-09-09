@@ -10,6 +10,9 @@ permissions:
   pull-requests: write   # 创建 PR
   issues: write          # 回复 Issue 评论
 
+env:
+  ACTIONS_RUNNER_FORCE_NODE24: "true"
+
 jobs:
   handle-approval:
     # 仅在非 Bot 评论，且包含 "同意" / "执行" / "approve" 等确认词时触发

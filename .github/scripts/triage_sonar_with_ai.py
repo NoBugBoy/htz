@@ -10,8 +10,8 @@ def run_cmd(cmd):
         print(f"[CMD WARN] {cmd}\n{res.stderr.strip()}")
     return res.stdout.strip()
 
-def get_code_context(file_path, target_line, radius=10):
-    """读取指定行前后10行的真实代码"""
+def get_code_context(file_path, target_line, radius=20):
+    """读取指定行前后20行的真实代码"""
     if not os.path.exists(file_path):
         return ""
     try:
@@ -23,12 +23,47 @@ def get_code_context(file_path, target_line, radius=10):
     except Exception:
         return ""
 
+def apply_single_fix(content, orig, fixed):
+    """智能代码替换，包含精确匹配、标准化换行/首尾空格容错匹配"""
+    if not orig:
+        return content, False
+
+    # 1. 尝试直接精确匹配
+    if orig in content:
+        return content.replace(orig, fixed, 1), True
+
+    # 2. 统一转换为 \n 换行后匹配
+    orig_norm = orig.replace("\r\n", "\n")
+    content_norm = content.replace("\r\n", "\n")
+    fixed_norm = fixed.replace("\r\n", "\n")
+    if orig_norm in content_norm:
+        return content_norm.replace(orig_norm, fixed_norm, 1), True
+
+    # 3. 去除首尾空白行后尝试匹配
+    orig_strip = orig_norm.strip()
+    if orig_strip and orig_strip in content_norm:
+        return content_norm.replace(orig_strip, fixed_norm.strip(), 1), True
+
+    # 4. 如果 orig 只有单行，尝试按行两端 strip 匹配
+    orig_lines = [l.strip() for l in orig_norm.split("\n") if l.strip()]
+    if len(orig_lines) == 1:
+        single_target = orig_lines[0]
+        c_lines = content_norm.split("\n")
+        for idx, line in enumerate(c_lines):
+            if line.strip() == single_target:
+                if fixed_norm.strip():
+                    indent = line[:len(line) - len(line.lstrip())]
+                    replacement_lines = [indent + l.lstrip() if l.strip() else "" for l in fixed_norm.split("\n")]
+                    c_lines[idx:idx+1] = replacement_lines
+                else:
+                    # 删除该行
+                    c_lines.pop(idx)
+                return "\n".join(c_lines), True
+
+    return content, False
+
 def get_blame_author(file_path, line, repo, headers, sha_cache):
-    """
-    通过 git blame 找到指定行的提交 SHA，再通过 GitHub API 获取提交者 GitHub 账号。
-    sha_cache: dict，避免对同一 SHA 重复发起 API 请求。
-    返回 "@login" 或 "作者名"（API 失败时兜底）。
-    """
+    """通过 git blame 找到指定行的提交 SHA 并通过 GitHub API 映射 @login"""
     if not os.path.exists(file_path):
         return None
     try:
@@ -41,20 +76,16 @@ def get_blame_author(file_path, line, repo, headers, sha_cache):
 
         blame_lines = result.stdout.split("\n")
         sha = blame_lines[0].split(" ")[0]
-        # 全零 SHA 表示未提交的改动
         if not sha or sha == "0" * 40:
             return None
 
-        # 先查缓存
         if sha in sha_cache:
             return sha_cache[sha]
 
-        # 解析本地 blame 输出中的作者名（兜底用）
         author_name = next(
             (l[7:] for l in blame_lines if l.startswith("author ")), ""
         ).strip()
 
-        # 通过 GitHub API 获取 @login
         res = requests.get(
             f"https://api.github.com/repos/{repo}/commits/{sha}",
             headers=headers
@@ -73,25 +104,23 @@ def get_blame_author(file_path, line, repo, headers, sha_cache):
         return None
 
 def ensure_label_exists(repo, headers, label_name, color="e11d48", description="AI 待决策"):
-    """确保 GitHub label 存在，不存在则自动创建"""
     res = requests.post(
         f"https://api.github.com/repos/{repo}/labels",
         json={"name": label_name, "color": color, "description": description},
         headers=headers
     )
-    if res.status_code == 201:
-        print(f"✅ 已自动创建 label: {label_name}")
-    elif res.status_code != 422:
+    if res.status_code not in (201, 422):
         print(f"⚠️ 创建 label 失败: {res.status_code} {res.text}")
 
 def fetch_all_sonar_issues(sonar_token, project_key):
-    """分页拉取全量 SonarCloud 问题，最多500条，按严重性排序"""
+    """拉取全量未解决缺陷（忽略最低级别 MINOR 和 INFO，仅拉取 BLOCKER, CRITICAL, MAJOR）"""
     all_issues = []
     page, page_size = 1, 100
     while True:
         url = (
             f"https://sonarcloud.io/api/issues/search"
             f"?componentKeys={project_key}&resolved=false&ps={page_size}&p={page}"
+            f"&severities=BLOCKER,CRITICAL,MAJOR"
         )
         res = requests.get(url, auth=(sonar_token, ""))
         if res.status_code != 200:
@@ -101,63 +130,74 @@ def fetch_all_sonar_issues(sonar_token, project_key):
         issues = data.get("issues", [])
         all_issues.extend(issues)
         total  = data.get("total", 0)
-        print(f"  已获取 {len(all_issues)}/{total} 条...")
-        if len(all_issues) >= total or not issues or len(all_issues) >= 500:
+        print(f"  已获取 {len(all_issues)}/{total} 条重点缺陷...")
+        if len(all_issues) >= total or not issues or len(all_issues) >= 200:
             break
         page += 1
 
-    all_issues.sort(key=lambda x: SEVERITY_ORDER.get(x.get("severity", "INFO"), 99))
-    return all_issues
+    # 过滤掉 .github/ 目录下的配置告警，仅保留真实业务与代码工程文件
+    valid_issues = []
+    for iss in all_issues:
+        raw_path = iss.get("component", "")
+        file_path = raw_path.split(":")[-1] if ":" in raw_path else raw_path
+        if file_path.startswith(".github/"):
+            continue
+        valid_issues.append(iss)
 
-def create_batch_issue(repo, headers, batch_issues, batch_index, total_batches, sha_cache):
-    """将一批问题创建为 GitHub Issue（直接展示原始数据，不调 AI，附带 @提交人）"""
+    valid_issues.sort(key=lambda x: SEVERITY_ORDER.get(x.get("severity", "MAJOR"), 99))
+    return valid_issues
+
+def create_review_issue(repo, headers, batch_issues, batch_title, batch_idx, total_batches):
+    """为真正涉及业务缺陷或需人工决策的问题创建 Issue"""
     rows = []
+    issue_authors = set()
     for i, iss in enumerate(batch_issues, 1):
-        sev        = iss.get("severity", "INFO")
+        sev        = iss.get("severity", "MAJOR")
         emoji      = SEVERITY_EMOJI.get(sev, "⚪")
-        raw_path   = iss.get("component", "")
-        file_path  = raw_path.split(":")[-1] if ":" in raw_path else raw_path
-        line       = iss.get("line", 1)
-        msg        = iss.get("message", "")[:100]
-        issue_type = iss.get("type", "")
-        rule       = iss.get("rule", "")
-        # 查 blame 作者（批量 Issue 只用本地 git blame，不调 GitHub API 避免限速）
-        author = get_blame_author(file_path, line, repo, headers, sha_cache) or "-"
-        rows.append(
-            f"| {i} | {emoji} {sev} | {issue_type} | `{file_path}` | {line} | {msg} | {rule} | {author} |"
-        )
+        file_path  = iss.get("file_path", "")
+        desc       = iss.get("issue_desc", "")
+        reason     = iss.get("reason", "")
+        author     = iss.get("blame_author") or "-"
+        if author and author != "-":
+            issue_authors.add(author)
+        rows.append(f"| {i} | {emoji} {sev} | `{file_path}` | {desc} | {reason} | {author} |")
 
     hidden_json = json.dumps(
-        {"batch_index": batch_index, "total_batches": total_batches, "issues": batch_issues},
+        {"batch_index": batch_idx, "total_batches": total_batches, "issues": batch_issues},
         ensure_ascii=False
     )
+    author_notice = (
+        f"\n> 📢 **涉及代码提交人**：{' '.join(sorted(issue_authors))} 请关注此 Issue。\n"
+        if issue_authors else ""
+    )
 
-    body = f"""## 🔍 SonarCloud 代码缺陷待处理（第 {batch_index} 批 / 共 {total_batches} 批）
+    body = f"""## ⚠️ SonarCloud 业务代码缺陷待决策
 
-| # | 严重性 | 类型 | 文件 | 行号 | 问题描述 | 规则 | 提交人 |
-|---|--------|------|------|------|----------|------|--------|
+> 以下缺陷涉及业务逻辑变更、算法重构或意图确认，AI 未自动执行修改，请人工审阅：
+{author_notice}
+| # | 严重性 | 文件 | 问题描述 | AI 判断原因 | 提交人 |
+|---|--------|------|----------|------------|--------|
 {chr(10).join(rows)}
 
 ---
 ### 💬 操作说明
-请在此 Issue 下回复您希望修复的项目，AI 将自动生成修复代码并发起 Pull Request：
-
-- `同意修复 1,3,5` → 仅修复第 1、3、5 项
-- `执行全部` → 修复本批全部问题
-- `跳过 2,4` → 修复除第 2、4 项外的全部问题
+若认可方案，请在此 Issue 下回复指令，AI 将自动完成修复并提 PR：
+- `同意修复 1,3` → 仅修复指定项
+- `执行全部` → 修复本 Issue 中的全部问题
+- `跳过 2` → 排除指定项，修复其余全部
 
 <!-- SONAR_ISSUE_DATA
 {hidden_json}
 -->
 """
     issue_payload = {
-        "title": f"⚠️ [Sonar 待决策] 第 {batch_index}/{total_batches} 批代码缺陷（{len(batch_issues)} 项）",
+        "title": batch_title,
         "body":  body,
         "labels": ["ai-needs-decision"]
     }
     res = requests.post(f"https://api.github.com/repos/{repo}/issues", json=issue_payload, headers=headers)
     if res.status_code == 201:
-        print(f"📌 已创建第 {batch_index} 批 Issue: {res.json().get('html_url')}")
+        print(f"📌 已创建待审核 Issue: {res.json().get('html_url')}")
     else:
         print(f"❌ 创建 Issue 失败: {res.status_code} {res.text}")
 
@@ -168,32 +208,28 @@ def main():
     gh_token    = os.environ["GITHUB_TOKEN"]
     headers     = {"Authorization": f"Bearer {gh_token}", "Accept": "application/vnd.github.v3+json"}
     model       = os.environ.get("AI_MODEL", "deepseek-v4-flash")
-    sha_cache   = {}  # SHA -> @mention 缓存，避免重复 API 调用
+    sha_cache   = {}
 
     ensure_label_exists(repo, headers, "ai-needs-decision")
 
-    # ── Step 1：拉取全量问题并按严重性排序 ──────────────────────────────────
-    print("📡 正在从 SonarCloud 拉取全量问题...")
-    all_issues = fetch_all_sonar_issues(sonar_token, project_key)
+    # ── Step 1：拉取所有非最低级别（BLOCKER, CRITICAL, MAJOR）的缺陷 ────────
+    print("📡 正在从 SonarCloud 拉取所有核心缺陷（已忽略 MINOR/INFO 级别）...")
+    issues = fetch_all_sonar_issues(sonar_token, project_key)
 
-    if not all_issues:
-        print("✅ SonarCloud 显示项目无任何未解决问题！")
+    if not issues:
+        print("✅ SonarCloud 显示项目无任何高/中危缺陷！")
         return
 
-    total     = len(all_issues)
-    top10     = all_issues[:10]
-    remaining = all_issues[10:]
-    print(f"📊 共 {total} 个问题：前 {len(top10)} 条自动分析，剩余 {len(remaining)} 条创建 Issue")
+    print(f"📊 共筛选出 {len(issues)} 个核心缺陷，正在读取代码上下文并查询提交人...")
 
-    # ── Step 2：对前10条高危问题 AI 三级分流 ─────────────────────────────────
-    print(f"\n🔍 读取前 {len(top10)} 条代码上下文并查询提交人...")
-    top10_summary = []
-    for iss in top10:
+    issues_summary = []
+    for iss in issues:
         raw_path  = iss.get("component", "")
         file_path = raw_path.split(":")[-1] if ":" in raw_path else raw_path
         line      = iss.get("line", 1)
         author    = get_blame_author(file_path, line, repo, headers, sha_cache)
-        top10_summary.append({
+        issues_summary.append({
+            "key":          iss.get("key"),
             "rule":         iss.get("rule"),
             "severity":     iss.get("severity"),
             "type":         iss.get("type"),
@@ -204,14 +240,21 @@ def main():
             "code_context": get_code_context(file_path, line)
         })
 
-    print(f"🤖 AI 正在对前 {len(top10)} 条进行三级分流分析...")
+    # ── Step 2：统一交给 AI 分析，简单非业务问题全部自动修，只有业务缺陷提 Issue ──
+    print("🤖 AI 正在进行全局审查：非业务代码缺陷直接修复，仅业务疑难缺陷提取 Issue...")
     client = OpenAI(
         api_key=os.environ["AI_API_KEY"],
         base_url=os.environ.get("AI_BASE_URL", "https://api.deepseek.com/v1")
     )
 
     system_prompt = """
-你是一名极其资深的 Java 架构师。对 SonarCloud 发现的代码缺陷进行三级分流，必须全部使用简体中文输出！
+你是一名极其资深的 Java 架构师。针对 SonarCloud 发现的代码缺陷进行分流与自动修复。
+必须全部使用简体中文输出！
+
+【极简原则】：
+1. 绝大部分非业务缺陷（单行或几行即可解决的代码异味、安全编码规范、死代码、空指针等），全部放入 auto_fix_list 自动修复！
+2. 只有真正涉及核心业务流程变化、可能改变功能行为、需要产品研发决策的疑难缺陷，才放入 need_review_list 提 Issue 人工审核！
+3. 测试类误报或完全无需修改的放入 ignore_list。
 
 严格输出以下格式的 JSON，不要包含任何 markdown 标记：
 {
@@ -220,8 +263,8 @@ def main():
       "file_path": "文件路径",
       "severity": "严重级别",
       "issue_desc": "缺陷简要说明",
-      "original_snippet": "在 code_context 中100%一字不差存在的原代码片段",
-      "fixed_snippet": "修复后的新代码"
+      "original_snippet": "待替换/删除的目标代码片段（只包含目标行，严禁包含无关周边行）",
+      "fixed_snippet": "修复后的新代码（如果是删除语句或死代码，直接填空字符串 \"\"）"
     }
   ],
   "need_review_list": [
@@ -229,63 +272,64 @@ def main():
       "file_path": "文件路径",
       "severity": "严重级别",
       "issue_desc": "缺陷简要说明",
-      "reason": "需要人工确认的原因（涉及业务逻辑/难以判断/改动影响范围大等）"
+      "reason": "需要人工审核的理由（具体改变了什么业务逻辑或决策）"
     }
   ],
   "ignore_list": [
     {
       "file_path": "文件路径",
-      "issue_desc": "缺陷简要说明",
-      "reason": "忽略原因（误报/低风险/框架已兜底/测试类等）"
+      "reason": "忽略原因"
     }
   ]
 }
 
-【三级分流标准】：
-- auto_fix_list（直接修复）：纯语法异味、NPE 防御、漏加 @Transactional、简单判空反转等，改动无业务副作用，且 original_snippet 能在 code_context 中精确匹配。
-- need_review_list（提 Issue 人工确认）：涉及业务逻辑改动、重构、安全漏洞需上下文确认、改动影响面广、难以判断是否安全、无法精确匹配代码的。
-- ignore_list（直接忽略）：测试类文件、配置文件误报、框架已兜底绝不会发生的问题、风险极低无修复必要的代码异味。
+【常见自动修复标准（一律放入 auto_fix_list）】：
+- 明显的致错空指针（如方法形参被置空 `request = null;`、`user = null;`），直接将该置空语句整行删除（fixed_snippet 传 ""）！
+- 无用局部变量与死代码（如 `String rawSql = ...;`、`String hardcodedJwtSecret = ...;` 未使用），直接整行删除！
+- 注释掉的代码块（S125），直接删除！
+- 工具类缺少私有构造函数（S1118），为工具类添加 private 构造方法！
+- Spring 注解规范（如 @Component 改为 @Service）（S5673），直接替换注解！
+- 未使用方法返回值（如 `orElseGet` 未使用），加上合理赋值或防御检查！
+- 常量判空反转（`"ABC".equals(val)` 代替 `val.equals("ABC")`）。
 
-【强制规则】：
-- original_snippet 必须在提供的真实 code_context 中完全精确匹配！不得虚构代码！
-- .github/ 目录下的文件一律放入 need_review_list，禁止自动修复！
-- 宁可放入 need_review_list 也不要凭猜测放入 auto_fix_list！
+【至关重要的精准替换规则】：
+- original_snippet 必须是【最小化目标行】（通常仅 1 行），严禁包含未修改的方法声明、括号或周边行！
+- 删除代码时：fixed_snippet 直接填空字符串 ""。
 """
 
     resp = client.chat.completions.create(
         model=model,
         messages=[
             {"role": "system", "content": system_prompt},
-            {"role": "user",   "content": f"待分析缺陷如下：\n{json.dumps(top10_summary, ensure_ascii=False, indent=2)}"}
+            {"role": "user",   "content": f"全部核心缺陷列表如下：\n{json.dumps(issues_summary, ensure_ascii=False, indent=2)}"}
         ],
         response_format={"type": "json_object"}
     )
 
     decision = json.loads(resp.choices[0].message.content)
-    print(f"🤖 AI 决策：\n{json.dumps(decision, ensure_ascii=False, indent=2)}")
+    print(f"🤖 AI 决策输出：\n{json.dumps(decision, ensure_ascii=False, indent=2)}")
 
-    # ── 忽略项：只打日志 ────────────────────────────────────────────────────
+    auto_fixes  = decision.get("auto_fix_list", [])
+    need_review = decision.get("need_review_list", [])
     ignore_list = decision.get("ignore_list", [])
-    if ignore_list:
-        print(f"\n🔕 AI 判定为忽略的问题（共 {len(ignore_list)} 条）：")
-        for item in ignore_list:
-            print(f"  - {item.get('file_path')}: {item.get('reason')}")
 
-    # ── 自动修复项：应用代码替换 → 提 PR（PR 中 @提交人） ──────────────────
-    auto_fixes = decision.get("auto_fix_list", [])
+    if ignore_list:
+        print(f"🔕 忽略项（共 {len(ignore_list)} 条）")
+
+    # ── Step 3：将所有简单非业务缺陷【全部一次性自动修复并提 PR】 ─────────
     if auto_fixes:
+        print(f"\n🚀 发现 {len(auto_fixes)} 个可自动解决的代码缺陷，正在统一修复提 PR...")
         branch_name = f"sonar-autofix-{os.environ.get('GITHUB_RUN_ID', 'dev')}"
         run_cmd(f"git checkout -b {branch_name}")
         modified   = False
         fix_descs  = []
-        # 收集涉及文件的提交人，去重后在 PR 中统一 @mention
         pr_authors = set()
 
         for fix in auto_fixes:
             fp    = fix["file_path"]
             orig  = fix["original_snippet"]
-            fixed = fix["fixed_snippet"]
-            sev   = fix.get("severity", "")
+            fixed = fix.get("fixed_snippet", "")
+            sev   = fix.get("severity", "MAJOR")
 
             if not os.path.exists(fp):
                 print(f"⚠️ 文件不存在，跳过: {fp}")
@@ -294,23 +338,19 @@ def main():
             with open(fp, "r", encoding="utf-8") as f:
                 content = f.read()
 
-            if orig in content:
-                content = content.replace(orig, fixed, 1)
+            new_content, success = apply_single_fix(content, orig, fixed)
+            if success:
                 with open(fp, "w", encoding="utf-8") as f:
-                    f.write(content)
+                    f.write(new_content)
                 modified = True
-                # 从 top10_summary 中找对应的 blame_author
-                author = next(
-                    (s.get("blame_author") for s in top10_summary if s["file"] == fp),
-                    None
-                )
+                author = next((s.get("blame_author") for s in issues_summary if s["file"] == fp), None)
                 author_str = f"（提交人：{author}）" if author else ""
                 fix_descs.append(f"- [{sev}] `{fp}`{author_str}: {fix['issue_desc']}")
-                if author:
+                if author and author != "-":
                     pr_authors.add(author)
-                print(f"✅ 成功修复: {fp}  提交人: {author or '未知'}")
+                print(f"✅ 成功修复: {fp}  {author_str}")
             else:
-                print(f"⚠️ 未能精确匹配旧代码，跳过: {fp}")
+                print(f"⚠️ 未能精确匹配旧代码，跳过: {fp} -> {repr(orig)}")
 
         if modified:
             print("🎨 执行 Spotless 格式化...")
@@ -318,116 +358,56 @@ def main():
             run_cmd("git config user.name 'github-actions[bot]'")
             run_cmd("git config user.email 'github-actions[bot]@users.noreply.github.com'")
             run_cmd("git add .")
-            run_cmd("git commit -m 'fix: AI 自动修复 Sonar TOP10 高危缺陷'")
+            run_cmd(f"git commit -m 'fix: AI 自动批量修复 {len(fix_descs)} 项非业务代码缺陷'")
             run_cmd(f"git push origin {branch_name} --force")
 
             author_notice = (
-                f"\n\n> 📢 **涉及代码提交人**：{' '.join(sorted(pr_authors))}  请关注此 PR。"
+                f"\n\n> 📢 **涉及代码提交人**：{' '.join(sorted(pr_authors))} 请关注此 PR。"
                 if pr_authors else ""
             )
             pr_payload = {
-                "title": "🤖 [Sonar+AI] 自动修复高危代码缺陷",
+                "title": f"🤖 [Sonar+AI Auto-Fix] 自动批量修复 {len(fix_descs)} 项代码缺陷",
                 "head":  branch_name,
                 "base":  "htz",
                 "body":  (
-                    "### SonarCloud 高危缺陷自动修复报告\n"
-                    "本 PR 由 AI 对按严重性排序的前10条问题进行三级分流后自动修复，已执行 Spotless 格式化。\n\n"
-                    "**修复项：**\n" + "\n".join(fix_descs) + author_notice
+                    f"### SonarCloud 代码缺陷自动批量修复报告\n"
+                    f"本次流水线共自动识别并消除了 **{len(fix_descs)}** 项非业务代码缺陷/安全隐患，已执行 Spotless 格式化。\n\n"
+                    f"**修复清单：**\n" + "\n".join(fix_descs) + author_notice
                 )
             }
             pr_res = requests.post(f"https://api.github.com/repos/{repo}/pulls", json=pr_payload, headers=headers)
             if pr_res.status_code == 201:
-                print(f"🎉 成功创建修复 PR: {pr_res.json().get('html_url')}")
+                print(f"🎉 成功创建自动修复 PR: {pr_res.json().get('html_url')}")
             else:
-                print(f"❌ 创建 PR 失败! 状态码: {pr_res.status_code}, 错误: {pr_res.text}")
+                print(f"❌ 创建 PR 失败: {pr_res.status_code} {pr_res.text}")
         else:
-            print("ℹ️ 所有自动修复项均未能精确匹配，未产生代码变更")
+            print("ℹ️ 所有自动修复项未产生实际变更")
     else:
-        print("ℹ️ AI 判断前10条中无可安全自动修复的问题")
+        print("ℹ️ 未发现可直接自动修复的代码缺陷")
 
-    # ── 需人工确认项：创建 Issue，附 @提交人，复用隐藏 JSON 支持评论触发修复 ──
-    need_review = decision.get("need_review_list", [])
+    # ── Step 4：仅对涉及业务缺陷的问题提 Issue（>10条才分批，<=10条提1个Issue） ─
     if need_review:
-        print(f"\n⚠️ 需人工确认的问题（共 {len(need_review)} 条），正在创建 Issue...")
+        # 补全 blame 作者
+        for item in need_review:
+            fp = item.get("file_path", "")
+            item["blame_author"] = next((s.get("blame_author") for s in issues_summary if s["file"] == fp), None)
 
-        # 从 top10_summary 找到对应的 blame_author 和原始 issue 数据
-        def find_raw_and_author(file_path, issue_desc):
-            for s, iss in zip(top10_summary, top10):
-                if s["file"] == file_path:
-                    return iss, s.get("blame_author")
-            return None, None
+        total_review = len(need_review)
+        print(f"\n⚠️ 发现 {total_review} 个真正涉及业务逻辑的缺陷，正在生成 Issue...")
 
-        rows = []
-        matched_raw_issues = []
-        issue_authors = set()
-        for i, item in enumerate(need_review, 1):
-            sev    = item.get("severity", "")
-            emoji  = SEVERITY_EMOJI.get(sev, "⚪")
-            fp     = item.get("file_path", "")
-            desc   = item.get("issue_desc", "")
-            reason = item.get("reason", "")
-            raw, author = find_raw_and_author(fp, desc)
-            author_str  = author or "-"
-            if author:
-                issue_authors.add(author)
-            rows.append(f"| {i} | {emoji} {sev} | `{fp}` | {desc} | {reason} | {author_str} |")
-            matched_raw_issues.append(raw if raw else {
-                "component": fp, "severity": sev, "message": desc, "type": "REVIEW_REQUIRED"
-            })
-
-        hidden_json = json.dumps(
-            {"batch_index": "TOP10-REVIEW", "total_batches": "TOP10-REVIEW",
-             "issues": matched_raw_issues},
-            ensure_ascii=False
-        )
-        author_notice = (
-            f"\n> 📢 **涉及代码提交人**：{' '.join(sorted(issue_authors))}  请关注此 Issue。\n"
-            if issue_authors else ""
-        )
-
-        body = f"""## ⚠️ SonarCloud TOP10 中需人工确认的问题（共 {len(need_review)} 项）
-
-> AI 已对前10条高危问题完成三级分流：
-> - ✅ 可安全修复的已自动提 PR
-> - 🔕 误报/低风险的已忽略
-> - ⚠️ 以下问题涉及业务逻辑或难以判断，需您决策
-{author_notice}
-| # | 严重性 | 文件 | 问题描述 | AI 判断原因 | 提交人 |
-|---|--------|------|----------|------------|--------|
-{chr(10).join(rows)}
-
----
-### 💬 操作说明
-请在此 Issue 下回复您希望修复的项目：
-- `同意修复 1,3` → 仅修复第 1、3 项
-- `执行全部` → 修复本 Issue 全部问题
-- `跳过 2` → 修复除第 2 项外的全部
-
-<!-- SONAR_ISSUE_DATA
-{hidden_json}
--->
-"""
-        issue_payload = {
-            "title": f"⚠️ [Sonar TOP10 待决策] {len(need_review)} 个问题涉及业务逻辑，需人工确认",
-            "body":  body,
-            "labels": ["ai-needs-decision"]
-        }
-        iss_res = requests.post(f"https://api.github.com/repos/{repo}/issues", json=issue_payload, headers=headers)
-        if iss_res.status_code == 201:
-            print(f"📌 已创建 TOP10 待决策 Issue: {iss_res.json().get('html_url')}")
+        if total_review <= 10:
+            title = f"⚠️ [Sonar 待决策] 涉及业务逻辑的代码缺陷（共 {total_review} 项）"
+            create_review_issue(repo, headers, need_review, title, 1, 1)
         else:
-            print(f"❌ 创建 Issue 失败: {iss_res.status_code} {iss_res.text}")
+            batch_size = 10
+            batches = [need_review[i:i+batch_size] for i in range(0, total_review, batch_size)]
+            for idx, batch in enumerate(batches, 1):
+                title = f"⚠️ [Sonar 待决策] 涉及业务代码缺陷（第 {idx}/{len(batches)} 批，共 {len(batch)} 项）"
+                create_review_issue(repo, headers, batch, title, idx, len(batches))
+    else:
+        print("🎉 没有需要人工审核的复杂业务缺陷！不需要打扰开发者！")
 
-    # ── Step 3：剩余问题每10条一个 Issue，不调 AI，附 @提交人 ─────────────────
-    if remaining:
-        batch_size    = 10
-        batches       = [remaining[i:i+batch_size] for i in range(0, len(remaining), batch_size)]
-        total_batches = len(batches)
-        print(f"\n📋 剩余 {len(remaining)} 条问题，分为 {total_batches} 批创建 Issue（附提交人，无需 AI）...")
-        for idx, batch in enumerate(batches, 1):
-            create_batch_issue(repo, headers, batch, idx, total_batches, sha_cache)
-
-    print(f"\n✅ 全部处理完毕：前10条已分流，剩余 {len(remaining)} 条已按批创建 Issue 等待决策")
+    print("\n✅ 流水线治理分析完成！")
 
 if __name__ == "__main__":
     main()
