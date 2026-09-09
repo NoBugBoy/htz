@@ -30,10 +30,10 @@ public class SecurityConfig {
   private final ObjectMapper objectMapper;
 
   @Bean
-  public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+  public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception { // NOSONAR
     return http
         // 1. 现代无状态 API 标配：关闭 CSRF、CORS 放行、关闭默认 Session
-        .csrf(AbstractHttpConfigurer::disable)
+        .csrf(AbstractHttpConfigurer::disable) // NOSONAR: 无状态 JWT API，不使用 Cookie 会话，关闭 CSRF 是安全设计
         .cors(AbstractHttpConfigurer::disable)
         .sessionManagement(
             session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))

@@ -48,14 +48,10 @@ public class AdminRegisterUseCase implements UseCase<String, String>, CommandLin
   @Override
   public void run(String... args) throws Exception {
     var email = "admin@shenwu.com";
-    adminQueryService
-        .findAdminByEmail(email)
-        .orElseGet(
-            () -> {
-              String password = passwordEncoder.encode("123456");
-              Long superAdminId = adminCommandService.saveAdminUser(email, password);
-              adminRoleService.assignRole(superAdminId, AdminRoleEnum.SUPER_ADMIN);
-              return null;
-            });
+    if (adminQueryService.findAdminByEmail(email).isEmpty()) {
+      String password = passwordEncoder.encode("123456");
+      Long superAdminId = adminCommandService.saveAdminUser(email, password);
+      adminRoleService.assignRole(superAdminId, AdminRoleEnum.SUPER_ADMIN);
+    }
   }
 }

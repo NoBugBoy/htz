@@ -8,6 +8,8 @@ import java.security.spec.X509EncodedKeySpec;
 import java.util.Base64;
 
 public class RsaKeyUtils {
+  private RsaKeyUtils() {}
+
   /**
    * 将 RSA 公钥字符串实例化为 PublicKey 对象
    *

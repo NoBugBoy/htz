@@ -31,8 +31,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
  * <ul>
  *   <li>Token 有效：写入安全上下文，放行；
  *   <li>Token 无效/过期：不写上下文，放行后由 Security 决定 401；
- *   <li>临近过期：滑动续期，并通过 tokenRenew 缓存做并发防抖，保证同一 Token 的并发请求只签一次新
- *       Token、响应头保持一致。
+ *   <li>临近过期：滑动续期，并通过 tokenRenew 缓存做并发防抖，保证同一 Token 的并发请求只签一次新 Token、响应头保持一致。
  * </ul>
  */
 @Component
@@ -95,11 +94,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
   /** 剩余有效期不足续期窗口时，签发新 Token 并通过响应头返回给前端。 */
   private void maybeRenew(
-      HttpServletResponse response,
-      String token,
-      Claims claims,
-      Long userId,
-      List<String> roles) {
+      HttpServletResponse response, String token, Claims claims, Long userId, List<String> roles) {
 
     // 能走到这里说明 JJWT 已通过过期校验，exp 一定存在
     long remaining = claims.getExpiration().getTime() - System.currentTimeMillis();
@@ -123,8 +118,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
   }
 
   /**
-   * userId 兼容解析：JJWT 反序列化 JSON 数字时，小整数会得到 Integer，大整数才是 Long，
-   * 因此统一按 Number 取值；兜底用 subject（签发时固定写入 userId）。
+   * userId 兼容解析：JJWT 反序列化 JSON 数字时，小整数会得到 Integer，大整数才是 Long， 因此统一按 Number 取值；兜底用 subject（签发时固定写入
+   * userId）。
    */
   private static Long extractUserId(Claims claims) {
     if (claims.get("userId") instanceof Number number) {
