@@ -7,10 +7,24 @@ def run_cmd(cmd):
         print(f"[CMD WARN] {cmd}\n{result.stderr.strip()}")
     return result.stdout.strip()
 
+def ensure_label_exists(repo, headers, label_name, color="e11d48", description="AI 待决策"):
+    """确保 GitHub label 存在，不存在则自动创建"""
+    res = requests.post(
+        f"https://api.github.com/repos/{repo}/labels",
+        json={"name": label_name, "color": color, "description": description},
+        headers=headers
+    )
+    if res.status_code == 201:
+        print(f"✅ 已自动创建 label: {label_name}")
+    elif res.status_code == 422:
+        pass  # label 已存在，正常
+    else:
+        print(f"⚠️ 创建 label 失败: {res.status_code} {res.text}")
+
 def main():
     report_file = "semgrep_report.json"
     if not os.path.exists(report_file):
-        print("未发现扫描结果文件")
+        print("❌ 未发现扫描结果文件 semgrep_report.json")
         return
 
     with open(report_file, "r", encoding="utf-8") as f:
@@ -21,21 +35,34 @@ def main():
         print("✅ 未发现任何代码缺陷！")
         return
 
-    print(f"📊 Semgrep 共扫描出 {len(findings)} 个问题，正在交给 AI 进行智能研判...")
+    total         = len(findings)
+    process_count = min(10, total)
+    print(f"📊 Semgrep 共扫描出 {total} 个问题，本次处理前 {process_count} 条...")
 
     issues_summary = []
-    for f in findings[:5]: # 取前 5 个进行治理分析
+    for f in findings[:process_count]:
         issues_summary.append({
             "check_id": f.get("check_id"),
-            "path": f.get("path"),
-            "line": f.get("start", {}).get("line"),
-            "code": f.get("extra", {}).get("lines"),
-            "message": f.get("extra", {}).get("message")
+            "path":     f.get("path"),
+            "line":     f.get("start", {}).get("line"),
+            "code":     f.get("extra", {}).get("lines"),
+            "message":  f.get("extra", {}).get("message")
         })
+
+    if total > process_count:
+        print(f"⚠️ 还有 {total - process_count} 条问题因批量限制被跳过")
+
+    repo    = os.environ["GITHUB_REPOSITORY"]
+    token   = os.environ["GITHUB_TOKEN"]
+    headers = {"Authorization": f"Bearer {token}", "Accept": "application/vnd.github.v3+json"}
+    model   = os.environ.get("AI_MODEL", "deepseek-v4-flash")
+
+    # 优先保证 label 存在
+    ensure_label_exists(repo, headers, "ai-needs-decision")
 
     client = OpenAI(
         api_key=os.environ["AI_API_KEY"],
-        base_url=os.environ.get("AI_BASE_URL", "https://api.openai.com/v1")
+        base_url=os.environ.get("AI_BASE_URL", "https://api.deepseek.com/v1")
     )
 
     system_prompt = """
@@ -57,7 +84,7 @@ def main():
   ],
   "need_review_list": [
     {
-      "title": "简短的中文 Issue 标题（例如：代码中存在潜在的空指针或硬编码风险）",
+      "title": "简短的中文 Issue 标题",
       "analysis": "用简体中文详细说明问题危害及发生原因",
       "recommended_plan": "用简体中文说明推荐的修复方案及示例代码",
       "target_file": "涉及文件相对路径"
@@ -74,7 +101,7 @@ def main():
 """
 
     resp = client.chat.completions.create(
-        model="deepseek-chat" if "deepseek" in os.environ.get("AI_BASE_URL", "") else "gpt-4o",
+        model=model,
         messages=[
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": f"扫描结果如下：\n{json.dumps(issues_summary, ensure_ascii=False)}"}
@@ -83,9 +110,14 @@ def main():
     )
 
     decision = json.loads(resp.choices[0].message.content)
-    repo = os.environ["GITHUB_REPOSITORY"]
-    token = os.environ["GITHUB_TOKEN"]
-    headers = {"Authorization": f"Bearer {token}", "Accept": "application/vnd.github.v3+json"}
+    print(f"🤖 AI 决策输出：\n{json.dumps(decision, ensure_ascii=False, indent=2)}")
+
+    # 打印忽略项
+    ignore_list = decision.get("ignore_list", [])
+    if ignore_list:
+        print(f"🔕 AI 判定为误报/忽略的问题：")
+        for reason in ignore_list:
+            print(f"  - {reason}")
 
     # ---------------- 1. 处理低风险自动修复 (Auto Fix -> 提 PR) ----------------
     auto_fixes = decision.get("auto_fix_list", [])
@@ -93,24 +125,30 @@ def main():
         branch_name = f"ai-autofix-{os.environ.get('GITHUB_RUN_ID', 'dev')}"
         run_cmd(f"git checkout -b {branch_name}")
 
-        modified = False
-        fix_descriptions = []
+        modified          = False
+        fix_descriptions  = []
         for fix in auto_fixes:
             file_path = fix["file_path"]
-            if os.path.exists(file_path):
-                with open(file_path, "r", encoding="utf-8") as rf:
-                    content = rf.read()
-                if fix["original_snippet"] in content:
-                    content = content.replace(fix["original_snippet"], fix["fixed_snippet"], 1)
-                    with open(file_path, "w", encoding="utf-8") as wf:
-                        wf.write(content)
-                    modified = True
-                    fix_descriptions.append(f"- [{fix['file_path']}]: {fix['issue_desc']}")
-                    print(f"已自动修改文件: {file_path}")
+            if not os.path.exists(file_path):
+                print(f"⚠️ 文件不存在，跳过: {file_path}")
+                continue
+
+            with open(file_path, "r", encoding="utf-8") as rf:
+                content = rf.read()
+
+            if fix["original_snippet"] in content:
+                content = content.replace(fix["original_snippet"], fix["fixed_snippet"], 1)
+                with open(file_path, "w", encoding="utf-8") as wf:
+                    wf.write(content)
+                modified = True
+                fix_descriptions.append(f"- [`{fix['file_path']}`]: {fix['issue_desc']}")
+                print(f"✅ 已自动修改文件: {file_path}")
+            else:
+                print(f"⚠️ 未能精确匹配旧代码，跳过: {file_path}")
 
         if modified:
-            print("正在执行 Spotless 格式化...")
-            run_cmd("mvn spotless:apply || ./gradlew spotlessApply || true")
+            print("🎨 正在执行 Spotless 格式化...")
+            run_cmd("mvn spotless:apply -q || ./gradlew spotlessApply || true")
 
             run_cmd("git config user.name 'github-actions[bot]'")
             run_cmd("git config user.email 'github-actions[bot]@users.noreply.github.com'")
@@ -123,19 +161,26 @@ def main():
                 "title": "🤖 [AI Auto-Fix] 修复低风险代码异味及安全缺陷",
                 "head": branch_name,
                 "base": "htz",
-                "body": "### AI 自动修复报告\n本 PR 由 AI 自动扫描并完成修复，已通过 Spotless 格式化。\n\n" + "\n".join(fix_descriptions)
+                "body": (
+                    "### AI 自动修复报告\n"
+                    "本 PR 由 AI 自动扫描并完成修复，已通过 Spotless 格式化，请 Code Review 后合并。\n\n"
+                    "**本次修复项：**\n" + "\n".join(fix_descriptions)
+                )
             }
             pr_res = requests.post(f"https://api.github.com/repos/{repo}/pulls", json=pr_payload, headers=headers)
             if pr_res.status_code == 201:
                 print(f"✅ 成功创建自动修复 PR: {pr_res.json().get('html_url')}")
             else:
                 print(f"❌ 创建 PR 失败! 状态码: {pr_res.status_code}, 返回: {pr_res.text}")
+        else:
+            print("ℹ️ 所有自动修复项均未能精确匹配，未产生代码变更")
 
     # ---------------- 2. 处理复杂业务问题 (Need Review -> 提 Issue) ----------------
     reviews = decision.get("need_review_list", [])
     for item in reviews:
         issue_body = f"""### ⚠️ 问题深度分析
 **涉及文件**：`{item.get('target_file')}`
+
 **根因与危害**：
 {item.get('analysis')}
 

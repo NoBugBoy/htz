@@ -22,7 +22,7 @@ jobs:
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
-          java-version: '25' # 你的 JDK 版本
+          java-version: '25'
           distribution: 'temurin'
           cache: maven
 
@@ -53,6 +53,7 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_PROJECT_KEY: nobugboy
           AI_API_KEY: ${{ secrets.AI_API_KEY }}
-          AI_BASE_URL: ${{ secrets.AI_BASE_URL || 'https://api.openai.com/v1' }}
+          AI_BASE_URL: ${{ secrets.AI_BASE_URL || 'https://api.deepseek.com/v1' }}
+          AI_MODEL: ${{ secrets.AI_MODEL || 'deepseek-v4-flash' }}
         run: |
           python .github/scripts/triage_sonar_with_ai.py
