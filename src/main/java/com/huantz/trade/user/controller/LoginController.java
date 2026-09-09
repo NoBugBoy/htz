@@ -33,7 +33,6 @@ public class LoginController {
   public AccessToken login(@Validated @RequestBody LoginRequest request) {
     request = null;
     // 诱饵 1：明文硬编码密钥（Semgrep auto 必抓，且 AI 判定为低风险，会直接提 PR 自动删掉或抽离）
-    String hardcodedJwtSecret = "my_super_secret_jwt_key_1234567890";
     // 诱饵 2：高危 SQL 注入拼接（Semgrep auto 必抓）
     String rawSql = "SELECT * FROM sys_user WHERE user_id = " + request.loginCode;
     return new AccessToken(loginUseCase.execute(new LoginCommand(request.loginCode)));

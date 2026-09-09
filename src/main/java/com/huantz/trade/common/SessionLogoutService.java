@@ -12,8 +12,7 @@ import org.springframework.stereotype.Component;
 /**
  * 退出登录：把当前 Bearer Token 的 jti 写入黑名单，之后携带该 Token 的请求会被 JWT 过滤器拒绝。
  *
- * <p>无状态 JWT 本身无法“服务端删除”，只能靠黑名单让 token 提前失效；
- * 黑名单记录由 Caffeine 在 2 小时后自动清理，覆盖 1 小时的 token 有效期。
+ * <p>无状态 JWT 本身无法“服务端删除”，只能靠黑名单让 token 提前失效； 黑名单记录由 Caffeine 在 2 小时后自动清理，覆盖 1 小时的 token 有效期。
  */
 @Component
 @RequiredArgsConstructor
@@ -36,8 +35,7 @@ public class SessionLogoutService {
     }
 
     try {
-      Claims claims =
-          JwtUtils.parseAndVerifyToken(token, properties.security().getPublicKey());
+      Claims claims = JwtUtils.parseAndVerifyToken(token, properties.security().getPublicKey());
       String jti = claims.getId();
       if (jti != null) {
         cacheHelper.put(TokenCacheKey.BLACKLIST, jti, jti);

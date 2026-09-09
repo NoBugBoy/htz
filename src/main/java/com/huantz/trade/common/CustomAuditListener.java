@@ -8,6 +8,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 
 /**
  * 通用 JPA 实体自动审计监听器
+ *
  * @author yujian
  */
 public class CustomAuditListener {
