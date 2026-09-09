@@ -41,8 +41,8 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: |
           mvn -B clean verify org.sonarsource.scanner.maven:sonar-maven-plugin:sonar \
-            -Dsonar.projectKey=你的_PROJECT_KEY \
-            -Dsonar.organization=你的_ORGANIZATION_KEY \
+            -Dsonar.projectKey=nobugboy \
+            -Dsonar.organization=nobugboy \
             -Dsonar.host.url=https://sonarcloud.io \
             -DskipTests=true
 
@@ -51,7 +51,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_PROJECT_KEY: 你的_PROJECT_KEY
+          SONAR_PROJECT_KEY: nobugboy
           AI_API_KEY: ${{ secrets.AI_API_KEY }}
           AI_BASE_URL: ${{ secrets.AI_BASE_URL || 'https://api.openai.com/v1' }}
         run: |
