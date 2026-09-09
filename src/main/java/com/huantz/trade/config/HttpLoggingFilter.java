@@ -11,7 +11,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
-import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -69,12 +68,14 @@ public class HttpLoggingFilter extends OncePerRequestFilter {
       long duration = System.currentTimeMillis() - startTime;
       int status = responseWrapper.getStatus();
 
-      String requestBody = getPayload(requestWrapper.getContentAsByteArray(), request.getContentType());
-      String responseBody = getPayload(responseWrapper.getContentAsByteArray(), responseWrapper.getContentType());
+      String requestBody =
+          getPayload(requestWrapper.getContentAsByteArray(), request.getContentType());
+      String responseBody =
+          getPayload(responseWrapper.getContentAsByteArray(), responseWrapper.getContentType());
 
       log.info(
           """
-          
+
           ====================== [HTTP LOG] ======================
           --> {} {} (IP: {})
           Request Body : {}

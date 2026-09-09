@@ -6,7 +6,6 @@ import org.springframework.beans.factory.BeanRegistrar;
 import org.springframework.beans.factory.BeanRegistry;
 import org.springframework.cache.caffeine.CaffeineCacheManager;
 import org.springframework.core.env.Environment;
-import org.springframework.mail.javamail.JavaMailSenderImpl;
 
 public class RegisterBeanConfig implements BeanRegistrar {
   @Override

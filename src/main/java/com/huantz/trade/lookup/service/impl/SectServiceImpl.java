@@ -1,15 +1,21 @@
 package com.huantz.trade.lookup.service.impl;
 
 import com.huantz.trade.exception.BusinessException;
+import com.huantz.trade.lookup.SectService;
 import com.huantz.trade.lookup.mapper.SectMapper;
+import com.huantz.trade.lookup.model.dto.SectDTO;
 import com.huantz.trade.lookup.model.entity.QSectEntity;
 import com.huantz.trade.lookup.model.entity.SectEntity;
 import com.huantz.trade.lookup.model.request.SectPageRequest;
 import com.huantz.trade.lookup.model.request.SectRequest;
+import com.huantz.trade.lookup.model.response.SectOptionResponse;
 import com.huantz.trade.lookup.model.response.SectPageResponse;
 import com.huantz.trade.lookup.repository.SectRepository;
-import com.huantz.trade.lookup.service.SectService;
+import com.querydsl.core.types.Projections;
 import com.querydsl.core.types.dsl.BooleanExpression;
+import com.querydsl.jpa.impl.JPAQueryFactory;
+import java.util.List;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Service;
@@ -21,6 +27,7 @@ import org.springframework.util.StringUtils;
 public class SectServiceImpl implements SectService {
   private final SectRepository sectRepository;
   private final SectMapper sectMapper;
+  private final JPAQueryFactory queryFactory;
 
   @Override
   public Page<SectPageResponse> page(SectPageRequest request) {
@@ -37,7 +44,7 @@ public class SectServiceImpl implements SectService {
             : sectRepository.findAll(condition, request.toPageable());
 
     return sectEntities.map(
-        it -> new SectPageResponse(it.getId(), it.getSectName(), it.getUpdateTime()));
+        it -> new SectPageResponse(it.getId(), it.getSectName(), it.getCreateTime()));
   }
 
   @Override
@@ -65,5 +72,21 @@ public class SectServiceImpl implements SectService {
     sectEntity.setSectName(request.sectName());
 
     sectRepository.saveAndFlush(sectEntity);
+  }
+
+  @Override
+  public List<SectOptionResponse> options() {
+    QSectEntity sect = QSectEntity.sectEntity;
+
+    return queryFactory
+        .select(Projections.constructor(SectOptionResponse.class, sect.id, sect.sectName))
+        .orderBy(sect.createTime.desc())
+        .from(sect)
+        .fetch();
+  }
+
+  @Override
+  public Optional<SectDTO> getById(Long sectId) {
+    return sectRepository.findById(sectId).map(it -> new SectDTO(it.getId(), it.getSectName()));
   }
 }

@@ -1,15 +1,12 @@
 package com.huantz.trade.lookup.controller;
 
-import com.huantz.trade.lookup.model.request.SectPageRequest;
-import com.huantz.trade.lookup.model.request.SectRequest;
-import com.huantz.trade.lookup.model.response.SectPageResponse;
-import com.huantz.trade.lookup.service.SectService;
+import com.huantz.trade.lookup.SectService;
+import com.huantz.trade.lookup.model.response.SectOptionResponse;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.validation.annotation.Validated;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/sect")
@@ -17,27 +14,13 @@ import org.springframework.web.bind.annotation.*;
 public class SectController {
   private final SectService sectService;
 
-  @GetMapping("/page")
-  public Page<SectPageResponse> page(@Validated SectPageRequest request) {
-    return sectService.page(request);
-  }
-
-  @DeleteMapping("/{sectId}")
-  public ResponseEntity<Void> delete(@PathVariable Long sectId) {
-    sectService.deleteById(sectId);
-    return ResponseEntity.noContent().build();
-  }
-
-  @PostMapping
-  public ResponseEntity<Void> add(@Validated @RequestBody SectRequest request) {
-    sectService.createSect(request);
-    return ResponseEntity.status(HttpStatus.ACCEPTED).build();
-  }
-
-  @PutMapping("/{sectId}")
-  public ResponseEntity<Void> update(
-      @PathVariable Long sectId, @Validated @RequestBody SectRequest request) {
-    sectService.update(sectId, request);
-    return ResponseEntity.noContent().build();
+  /**
+   * 查询门派下拉选项。
+   *
+   * @return 门派选项列表（ID + 门派名）
+   */
+  @GetMapping
+  public List<SectOptionResponse> options() {
+    return sectService.options();
   }
 }

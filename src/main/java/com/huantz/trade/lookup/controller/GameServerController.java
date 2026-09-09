@@ -1,15 +1,12 @@
 package com.huantz.trade.lookup.controller;
 
-import com.huantz.trade.lookup.model.request.GameServerPageRequest;
-import com.huantz.trade.lookup.model.request.GameServerRequest;
-import com.huantz.trade.lookup.model.response.GameSeverPageResponse;
-import com.huantz.trade.lookup.service.GameServerService;
+import com.huantz.trade.lookup.GameServerService;
+import com.huantz.trade.lookup.model.response.GameServerOptionResponse;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.validation.annotation.Validated;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/server")
@@ -17,27 +14,13 @@ import org.springframework.web.bind.annotation.*;
 public class GameServerController {
   private final GameServerService gameServerService;
 
-  @GetMapping("/page")
-  public Page<GameSeverPageResponse> page(@Validated GameServerPageRequest request) {
-    return gameServerService.page(request);
-  }
-
-  @DeleteMapping("/{sectId}")
-  public ResponseEntity<Void> delete(@PathVariable Long sectId) {
-    gameServerService.deleteById(sectId);
-    return ResponseEntity.noContent().build();
-  }
-
-  @PostMapping
-  public ResponseEntity<Void> add(@Validated @RequestBody GameServerRequest request) {
-    gameServerService.create(request);
-    return ResponseEntity.status(HttpStatus.ACCEPTED).build();
-  }
-
-  @PutMapping("/{sectId}")
-  public ResponseEntity<Void> update(
-      @PathVariable Long sectId, @Validated @RequestBody GameServerRequest request) {
-    gameServerService.update(sectId, request);
-    return ResponseEntity.noContent().build();
+  /**
+   * 查询游戏服务器下拉选项。
+   *
+   * @return 游戏服务器选项列表（ID + 服务器名）
+   */
+  @GetMapping
+  public List<GameServerOptionResponse> options() {
+    return gameServerService.options();
   }
 }

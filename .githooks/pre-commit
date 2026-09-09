@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+#
+# pre-commit: 对本次提交的 Java 文件执行 google-java-format
+#   - 删除无用 import
+#   - 排序 import
+#   - 按 Google Java Style 排版
+# 只处理 staged 文件，避免整仓格式化产生无关 diff。
+#
+# 启用方式（在项目根目录执行一次）：
+#   git config core.hooksPath .githooks
+
+set -euo pipefail
+
+files="$(git diff --cached --name-only --diff-filter=ACM -- '*.java')"
+
+if [ -z "$files" ]; then
+  exit 0
+fi
+
+# 多行文件列表 -> 逗号分隔，传给 spotlessFiles
+spotless_files="$(printf '%s' "$files" | paste -sd, -)"
+
+if ! mvn -q spotless:apply -DspotlessFiles="$spotless_files"; then
+  echo "google-java-format 执行失败，请先解决错误再提交。"
+  echo "可手动运行: mvn spotless:apply"
+  exit 1
+fi
+
+# 格式化后的文件重新加入暂存区，保证提交的是格式化后的内容
+printf '%s\n' "$files" | while IFS= read -r f; do
+  git add -- "$f"
+done

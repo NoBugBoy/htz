@@ -7,4 +7,4 @@ import java.time.LocalDateTime;
 public record SectPageResponse(
     Long sectId,
     String sectName,
-    @JsonFormat(pattern = DatePattern.NORM_DATETIME_PATTERN) LocalDateTime updateTime) {}
+    @JsonFormat(pattern = DatePattern.NORM_DATETIME_PATTERN) LocalDateTime createTime) {}

@@ -1,3 +1,10 @@
 package com.huantz.trade.lookup.model.response;
 
-public record GameSeverPageResponse(Long serverId, String serverName) {}
+import cn.hutool.core.date.DatePattern;
+import com.fasterxml.jackson.annotation.JsonFormat;
+import java.time.LocalDateTime;
+
+public record GameSeverPageResponse(
+    Long serverId,
+    String serverName,
+    @JsonFormat(pattern = DatePattern.NORM_DATETIME_PATTERN) LocalDateTime createTime) {}

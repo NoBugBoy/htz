@@ -1,0 +1,45 @@
+name: AI Code Governance
+
+on:
+  workflow_dispatch: # 支持网页上手动点按钮触发
+  schedule:
+    - cron: '0 2 * * 1' # 每周一凌晨自动巡检
+
+jobs:
+  triage-and-remediate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # 获取完整 Git 历史，便于分支和 PR 操作
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: '25' # 你的实际 JDK 版本
+          distribution: 'temurin'
+          cache: maven # 或 gradle
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install Tools
+        run: |
+          pip install semgrep requests openai
+
+      # 1. 静态扫描
+      - name: Run Semgrep Scan
+        run: |
+          semgrep scan --config auto --json -o semgrep_report.json || true
+
+      # 2. AI 分级处理（误报忽略、简单问题改代码、复杂问题提 Issue）
+      - name: Run AI Triage & Action
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          AI_API_KEY: ${{ secrets.AI_API_KEY }}
+          AI_BASE_URL: ${{ secrets.AI_BASE_URL || 'https://api.openai.com/v1' }}
+        run: |
+          python .github/scripts/triage_and_act.py

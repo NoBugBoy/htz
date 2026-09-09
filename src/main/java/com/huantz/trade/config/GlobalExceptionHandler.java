@@ -8,6 +8,8 @@ import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -68,7 +70,13 @@ public class GlobalExceptionHandler {
 
   // ================= 3. 兜底处理未捕获的系统异常 =================
   @ExceptionHandler(Exception.class)
-  public ProblemDetail handleGeneralException(Exception ex) {
+  public ProblemDetail handleGeneralException(Exception ex) throws Exception {
+    // 认证/授权异常必须继续上抛，交给 Spring Security 的 ExceptionTranslationFilter
+    // 统一走 authenticationEntryPoint(401) / accessDeniedHandler(403)，
+    // 否则会被这里的兜底逻辑截胡成 500。
+    if (ex instanceof AuthenticationException || ex instanceof AccessDeniedException) {
+      throw ex;
+    }
     log.error("未捕获的系统全局异常: ", ex);
     ProblemDetail problem =
         ProblemDetail.forStatusAndDetail(HttpStatus.INTERNAL_SERVER_ERROR, "系统繁忙，请稍后再试");
