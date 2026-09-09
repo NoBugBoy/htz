@@ -2,8 +2,13 @@ name: AI Code Governance
 
 on:
   workflow_dispatch: # 支持网页上手动点按钮触发
-  schedule:
-    - cron: '0 2 * * 1' # 每周一凌晨自动巡检
+  push:
+    branches:
+      - htz          # 当代码 push 到 htz 分支时立即自动触发
+      - main         # 如果后续切回 main 也会触发
+    paths:
+      - 'src/**'       # 只有 src 目录下的代码变动才触发
+      - 'pom.xml'      # 或 build.gradle
 
 jobs:
   triage-and-remediate:
