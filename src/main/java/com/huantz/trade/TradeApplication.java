@@ -14,6 +14,11 @@ import org.springframework.data.web.config.EnableSpringDataWebSupport;
     pageSerializationMode = EnableSpringDataWebSupport.PageSerializationMode.VIA_DTO)
 @Import(RegisterBeanConfig.class)
 public class TradeApplication {
+  /**
+   * 入口
+   *
+   * @param args
+   */
   public static void main(String[] args) {
     SpringApplication.run(TradeApplication.class, args);
   }
