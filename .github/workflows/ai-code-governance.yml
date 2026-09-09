@@ -1,50 +1,63 @@
-name: AI Code Governance
+name: AI Code Governance with SonarCloud
 
 on:
-  workflow_dispatch: # 支持网页上手动点按钮触发
+  workflow_dispatch:
   push:
     branches:
-      - htz          # 当代码 push 到 htz 分支时立即自动触发
-      - main         # 如果后续切回 main 也会触发
+      - htz
     paths:
-      - 'src/**'       # 只有 src 目录下的代码变动才触发
-      - 'pom.xml'      # 或 build.gradle
+      - 'src/**'
+      - 'pom.xml'
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  workflows: write
 
 jobs:
-  triage-and-remediate:
+  sonar-and-ai:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # 获取完整 Git 历史，便于分支和 PR 操作
+          fetch-depth: 0 # Sonar 需要完整的 Git 历史来比对责任人和代码变更
 
       - name: Set up Java
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v4
         with:
-          java-version: '25' # 你的实际 JDK 版本
+          java-version: '17' # 你的 JDK 版本
           distribution: 'temurin'
-          cache: maven # 或 gradle
+          cache: maven
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
 
-      - name: Install Tools
-        run: |
-          pip install semgrep requests openai
+      - name: Install Dependencies
+        run: pip install requests openai
 
-      # 1. 静态代码扫描：指定只扫 src/ 目录，且加载 Java 专属代码质量与漏洞规则包
-      - name: Run Semgrep Scan
-        run: |
-          semgrep scan --config "p/java" --config "p/owasp-top-ten" src/ --json -o semgrep_report.json || true
-
-      # 2. AI 分级处理（误报忽略、简单问题改代码、复杂问题提 Issue）
-      - name: Run AI Triage & Action
+      # 1. 编译并推送分析到 SonarCloud（核心步骤）
+      - name: Build and analyze with SonarCloud
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          mvn -B clean verify org.sonarsource.scanner.maven:sonar-maven-plugin:sonar \
+            -Dsonar.projectKey=你的_PROJECT_KEY \
+            -Dsonar.organization=你的_ORGANIZATION_KEY \
+            -Dsonar.host.url=https://sonarcloud.io \
+            -DskipTests=true
+
+      # 2. 调用 Python 脚本通过 SonarCloud REST API 拉取刚才扫出来的缺陷，喂给 AI 自动修代码！
+      - name: Fetch Sonar Issues and AI Triage
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_PROJECT_KEY: 你的_PROJECT_KEY
           AI_API_KEY: ${{ secrets.AI_API_KEY }}
           AI_BASE_URL: ${{ secrets.AI_BASE_URL || 'https://api.openai.com/v1' }}
         run: |
-          python .github/scripts/triage_and_act.py
+          python .github/scripts/triage_sonar_with_ai.py
