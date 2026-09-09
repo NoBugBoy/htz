@@ -1,5 +1,6 @@
 package com.huantz.trade.config;
 
+import com.huantz.trade.enums.AdminRoleEnum;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import lombok.RequiredArgsConstructor;
@@ -8,6 +9,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -21,7 +23,7 @@ import tools.jackson.databind.ObjectMapper;
 @Configuration
 @EnableWebSecurity
 @RequiredArgsConstructor
-// @EnableMethodSecurity // 👈 核心：开启方法级权限控制 (@PreAuthorize)
+@EnableMethodSecurity
 public class SecurityConfig {
 
   private final JwtAuthenticationFilter jwtAuthFilter;
@@ -45,13 +47,16 @@ public class SecurityConfig {
             auth ->
                 auth.requestMatchers(
                         "/auth/**", // 登录、注册、短信验证码
+                        "/admin/auth/**", // 后台管理认证
                         "/v3/api-docs/**", // OpenAPI / Swagger 文档
                         "/swagger-ui/**",
                         "/actuator/health" // 探活检查
                         )
                     .permitAll()
+                    .requestMatchers("/admin/**")
+                    .hasAnyRole(AdminRoleEnum.ADMIN.name(), AdminRoleEnum.SUPER_ADMIN.name())
                     .anyRequest()
-                    .authenticated() // 剩下的请求只需要登录凭证即可通过
+                    .authenticated() // 剩下的请
             )
 
         // 4. 统一异常响应 (401 未登录 / 403 权限不足)
