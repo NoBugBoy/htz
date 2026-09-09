@@ -69,6 +69,8 @@ def main():
 - ignore_list：测试类文件、配置假阳性、有框架兜底不会发生的问题。
 - auto_fix_list：纯语法级、无业务副作用、影响范围极小（如 NPE 防御、简单日志脱敏、漏加 @Transactional、简单的判空反转）。
 - need_review_list：改动影响业务流程、涉及重构、需要产品/研发确认业务语义的问题。
+
+【特别警告】：.github/ 目录下的所有文件严禁放入 auto_fix_list！如果流水线有缺陷，必须放入 need_review_list 提 Issue 让人类确认！
 """
 
     resp = client.chat.completions.create(
