@@ -4,6 +4,12 @@ on:
   issue_comment:
     types: [ created ]
 
+# 显式声明所需权限，默认 GITHUB_TOKEN 缺少这些会导致 git push / 创建 PR 静默失败
+permissions:
+  contents: write        # git push 新分支
+  pull-requests: write   # 创建 PR
+  issues: write          # 回复 Issue 评论
+
 jobs:
   handle-approval:
     # 仅在非 Bot 评论，且包含 "同意" / "执行" / "approve" 等确认词时触发
@@ -20,7 +26,7 @@ jobs:
           fetch-depth: 0
 
       - name: Set up Java & Tools
-        uses: actions/setup-java@v4   # 修复：v5 不存在，改为 v4
+        uses: actions/setup-java@v4
         with:
           java-version: '25'
           distribution: 'temurin'

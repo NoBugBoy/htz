@@ -10,6 +10,12 @@ on:
       - 'src/**'       # 只有 src 目录下的代码变动才触发
       - 'pom.xml'      # 或 build.gradle
 
+# 显式声明所需权限
+permissions:
+  contents: write        # git push 新分支
+  pull-requests: write   # 创建 PR
+  issues: write          # 创建 Issue / 评论
+
 jobs:
   sonar-and-ai:
     runs-on: ubuntu-latest
