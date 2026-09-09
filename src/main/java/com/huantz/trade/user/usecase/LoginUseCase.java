@@ -1,7 +1,6 @@
 package com.huantz.trade.user.usecase;
 
 import cn.binarywang.wx.miniapp.api.WxMaService;
-import cn.binarywang.wx.miniapp.bean.WxMaPhoneNumberInfo;
 import com.huantz.trade.common.CustomerProperties;
 import com.huantz.trade.common.UseCase;
 import com.huantz.trade.exception.BusinessException;
@@ -49,19 +48,11 @@ public class LoginUseCase implements UseCase<LoginCommand, String> {
     }
 
     var user = userQueryService.isFirstLogin(openid);
-    //    if (StringUtils.hasText(registerCode) && ObjectUtils.isEmpty(user)) {
-    //      try {
-    //        phoneInfo = wxMaService.getUserService().getPhoneNoInfo(registerCode);
-    //      } catch (WxErrorException e) {
-    //        log.error("微信 code2phoneInfo 调用失败, registerCode: {}", registerCode, e);
-    //        throw handleWxException(e, "获取手机号失败");
-    //      }
-    //    }
-    return doRegisterAndLogin(user, openid, unionId, null);
+
+    return doRegisterAndLogin(user, openid, unionId);
   }
 
-  private String doRegisterAndLogin(
-      Optional<UserEntity> user, String openid, String unionId, WxMaPhoneNumberInfo phone) {
+  private String doRegisterAndLogin(Optional<UserEntity> user, String openid, String unionId) {
     var userId =
         user.orElseGet(
                 () -> {

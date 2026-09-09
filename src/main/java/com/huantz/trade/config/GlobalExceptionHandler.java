@@ -19,6 +19,8 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+  private static final String TIMESTAMP = "timestamp";
+
   // ================= 1. 核心：处理自定义业务异常 BusinessException =================
   @ExceptionHandler(BusinessException.class)
   public ProblemDetail handleBusinessException(BusinessException ex) {
@@ -31,7 +33,7 @@ public class GlobalExceptionHandler {
 
     // 2. 注入业务错误码和时间戳
     problem.setProperty("code", ex.getCode());
-    problem.setProperty("timestamp", Instant.now());
+    problem.setProperty(TIMESTAMP, Instant.now());
 
     // 3. 将业务上下文的动态参数全部无缝塞入 ProblemDetail
     if (!ex.getProperties().isEmpty()) {

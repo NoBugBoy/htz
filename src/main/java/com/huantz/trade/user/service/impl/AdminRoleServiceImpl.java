@@ -33,8 +33,12 @@ public class AdminRoleServiceImpl implements AdminRoleService {
   }
 
   @Override
-  public void assignRoles(Long userId, List<AdminRoleEnum> roles) {}
+  public void assignRoles(Long userId, List<AdminRoleEnum> roles) {
+    // 预留批量分配角色逻辑，暂不实现。
+  }
 
   @Override
-  public void deleteByUserId(Long userId) {}
+  public void deleteByUserId(Long userId) {
+    // 预留删除用户角色逻辑，暂不实现。
+  }
 }

@@ -10,6 +10,8 @@ import org.springframework.security.core.context.SecurityContextHolder;
  * @author yujian
  */
 public class SecurityHolder {
+  private SecurityHolder() {}
+
   public static Long getUserId() {
     return getLoginUser().orElseThrow().userId();
   }

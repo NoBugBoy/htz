@@ -43,7 +43,9 @@ public record LoginUserAuthentication(Long userId, List<String> roles) implement
   }
 
   @Override
-  public void setAuthenticated(boolean isAuthenticated) throws IllegalArgumentException {}
+  public void setAuthenticated(boolean isAuthenticated) throws IllegalArgumentException {
+    // 该认证对象始终已认证，不允许外部修改认证状态。
+  }
 
   @Override
   public String getName() {
