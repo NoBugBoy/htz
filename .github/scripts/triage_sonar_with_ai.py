@@ -10,15 +10,17 @@ def run_cmd(cmd):
         print(f"[CMD WARN] {cmd}\n{res.stderr.strip()}")
     return res.stdout.strip()
 
-def get_code_context(file_path, target_line, radius=20):
-    """读取指定行前后20行的真实代码"""
+def get_file_range_context(file_path, min_line, max_line, radius=15):
+    """根据文件中所有缺陷的行号范围，读取连贯的代码上下文（文件<=150行时直接提供全文）"""
     if not os.path.exists(file_path):
         return ""
     try:
         with open(file_path, "r", encoding="utf-8") as f:
             lines = f.readlines()
-        start = max(0, target_line - radius - 1)
-        end   = min(len(lines), target_line + radius)
+        if len(lines) <= 150:
+            return "".join(lines)
+        start = max(0, min_line - radius - 1)
+        end   = min(len(lines), max_line + radius)
         return "".join(lines[start:end])
     except Exception:
         return ""
@@ -147,6 +149,61 @@ def fetch_all_sonar_issues(sonar_token, project_key):
     valid_issues.sort(key=lambda x: SEVERITY_ORDER.get(x.get("severity", "MAJOR"), 99))
     return valid_issues
 
+def build_file_grouped_batches(issues, repo, headers, sha_cache, batch_size=20):
+    """
+    将 issues 按文件归类聚合，并装箱为每批约 20 个缺陷。
+    核心优势：
+    1. 同一个文件的所有缺陷 100% 聚在同一个批次内，绝不割裂。
+    2. 同一个文件的代码上下文只读取/发送 1 次，极度节约输入阅读 Token。
+    """
+    from collections import defaultdict
+    files_map = defaultdict(list)
+    for iss in issues:
+        raw_path  = iss.get("component", "")
+        file_path = raw_path.split(":")[-1] if ":" in raw_path else raw_path
+        files_map[file_path].append(iss)
+
+    batches = []
+    current_batch = []
+    current_count = 0
+
+    for file_path, file_issues in files_map.items():
+        # 若当前批次加上本文件 issues 超过 batch_size，且当前已有内容，则开启新批次
+        if current_count + len(file_issues) > batch_size and current_count > 0:
+            batches.append(current_batch)
+            current_batch = []
+            current_count = 0
+
+        lines = [iss.get("line", 1) for iss in file_issues if iss.get("line") is not None]
+        min_line = min(lines) if lines else 1
+        max_line = max(lines) if lines else 1
+        author   = get_blame_author(file_path, min_line, repo, headers, sha_cache)
+        code_ctx = get_file_range_context(file_path, min_line, max_line, radius=15)
+
+        file_obj = {
+            "file": file_path,
+            "blame_author": author,
+            "code_context": code_ctx,
+            "issues": [
+                {
+                    "key":      iss.get("key"),
+                    "line":     iss.get("line"),
+                    "rule":     iss.get("rule"),
+                    "severity": iss.get("severity"),
+                    "type":     iss.get("type"),
+                    "message":  iss.get("message")
+                }
+                for iss in file_issues
+            ]
+        }
+        current_batch.append(file_obj)
+        current_count += len(file_issues)
+
+    if current_batch:
+        batches.append(current_batch)
+
+    return batches
+
 def create_review_issue(repo, headers, batch_issues, batch_title, batch_idx, total_batches):
     """为真正涉及业务缺陷或需人工决策的问题创建 Issue"""
     rows = []
@@ -213,35 +270,18 @@ def main():
     ensure_label_exists(repo, headers, "ai-needs-decision")
 
     # ── Step 1：拉取所有非最低级别（BLOCKER, CRITICAL, MAJOR）的缺陷 ────────
-    print("📡 正在从 SonarCloud 拉取所有核心缺陷（已忽略 MINOR/INFO 级别）...")
-    issues = fetch_all_sonar_issues(sonar_token, project_key)
+    print("📡 正在从 SonarCloud 拉取核心缺陷（已忽略 MINOR/INFO 级别）...")
+    raw_issues = fetch_all_sonar_issues(sonar_token, project_key)
 
-    if not issues:
+    if not raw_issues:
         print("✅ SonarCloud 显示项目无任何高/中危缺陷！")
         return
 
-    print(f"📊 共筛选出 {len(issues)} 个核心缺陷，正在读取代码上下文并查询提交人...")
+    # ── Step 2：按文件聚合装箱（每批约20个，相同文件强绑定同组，极省Token） ──
+    batches = build_file_grouped_batches(raw_issues, repo, headers, sha_cache, batch_size=20)
+    total_issues = sum(sum(len(f["issues"]) for f in b) for b in batches)
+    print(f"📊 共筛选出 {total_issues} 个缺陷，已按文件聚合成 {len(batches)} 个微批次（每批约20项，同文件在同组）")
 
-    issues_summary = []
-    for iss in issues:
-        raw_path  = iss.get("component", "")
-        file_path = raw_path.split(":")[-1] if ":" in raw_path else raw_path
-        line      = iss.get("line", 1)
-        author    = get_blame_author(file_path, line, repo, headers, sha_cache)
-        issues_summary.append({
-            "key":          iss.get("key"),
-            "rule":         iss.get("rule"),
-            "severity":     iss.get("severity"),
-            "type":         iss.get("type"),
-            "file":         file_path,
-            "line":         line,
-            "message":      iss.get("message"),
-            "blame_author": author,
-            "code_context": get_code_context(file_path, line)
-        })
-
-    # ── Step 2：统一交给 AI 分析，简单非业务问题全部自动修，只有业务缺陷提 Issue ──
-    print("🤖 AI 正在进行全局审查：非业务代码缺陷直接修复，仅业务疑难缺陷提取 Issue...")
     client = OpenAI(
         api_key=os.environ["AI_API_KEY"],
         base_url=os.environ.get("AI_BASE_URL", "https://api.deepseek.com/v1")
@@ -250,6 +290,10 @@ def main():
     system_prompt = """
 你是一名极其资深的 Java 架构师。针对 SonarCloud 发现的代码缺陷进行分流与自动修复。
 必须全部使用简体中文输出！
+
+【输入格式】：
+每个条目是一个文件对象，包含 `file`、`code_context` 以及该文件下的 `issues` 缺陷列表。
+请结合该文件的上下文，对其中的各个缺陷进行分析与修复。
 
 【极简原则】：
 1. 绝大部分非业务缺陷（单行或几行即可解决的代码异味、安全编码规范、死代码、空指针等），全部放入 auto_fix_list 自动修复！
@@ -297,35 +341,44 @@ def main():
 - 删除代码时：fixed_snippet 直接填空字符串 ""。
 """
 
-    resp = client.chat.completions.create(
-        model=model,
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user",   "content": f"全部核心缺陷列表如下：\n{json.dumps(issues_summary, ensure_ascii=False, indent=2)}"}
-        ],
-        response_format={"type": "json_object"}
-    )
+    all_auto_fixes  = []
+    all_need_review = []
+    all_ignore_list = []
 
-    decision = json.loads(resp.choices[0].message.content)
-    print(f"🤖 AI 决策输出：\n{json.dumps(decision, ensure_ascii=False, indent=2)}")
+    # ── Step 3：分批调用 AI（同文件聚合同组，注意力集中，绝不截断） ───────────
+    for idx, batch in enumerate(batches, 1):
+        batch_issue_cnt = sum(len(f["issues"]) for f in batch)
+        print(f"🤖 正在处理第 {idx}/{len(batches)} 批（包含 {len(batch)} 个文件，共 {batch_issue_cnt} 个缺陷）...")
+        try:
+            resp = client.chat.completions.create(
+                model=model,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user",   "content": f"当前批次文件及缺陷列表如下：\n{json.dumps(batch, ensure_ascii=False, indent=2)}"}
+                ],
+                response_format={"type": "json_object"}
+            )
+            decision = json.loads(resp.choices[0].message.content)
+            all_auto_fixes.extend(decision.get("auto_fix_list", []))
+            all_need_review.extend(decision.get("need_review_list", []))
+            all_ignore_list.extend(decision.get("ignore_list", []))
+            print(f"  ✅ 第 {idx} 批决策完成：自动修复 {len(decision.get('auto_fix_list', []))} 项，待人工审核 {len(decision.get('need_review_list', []))} 项")
+        except Exception as e:
+            print(f"  ❌ 第 {idx} 批 AI 分析异常: {e}")
 
-    auto_fixes  = decision.get("auto_fix_list", [])
-    need_review = decision.get("need_review_list", [])
-    ignore_list = decision.get("ignore_list", [])
+    # 建立 file_path 到 blame_author 映射
+    file_author_map = {f["file"]: f.get("blame_author") for b in batches for f in b}
 
-    if ignore_list:
-        print(f"🔕 忽略项（共 {len(ignore_list)} 条）")
-
-    # ── Step 3：将所有简单非业务缺陷【全部一次性自动修复并提 PR】 ─────────
-    if auto_fixes:
-        print(f"\n🚀 发现 {len(auto_fixes)} 个可自动解决的代码缺陷，正在统一修复提 PR...")
+    # ── Step 4：将所有批次的非业务缺陷【汇总后一次性自动修复并提 PR】 ────────
+    if all_auto_fixes:
+        print(f"\n🚀 汇总得到 {len(all_auto_fixes)} 个可自动解决的代码缺陷，正在统一修复并提 PR...")
         branch_name = f"sonar-autofix-{os.environ.get('GITHUB_RUN_ID', 'dev')}"
         run_cmd(f"git checkout -b {branch_name}")
         modified   = False
         fix_descs  = []
         pr_authors = set()
 
-        for fix in auto_fixes:
+        for fix in all_auto_fixes:
             fp    = fix["file_path"]
             orig  = fix["original_snippet"]
             fixed = fix.get("fixed_snippet", "")
@@ -343,7 +396,7 @@ def main():
                 with open(fp, "w", encoding="utf-8") as f:
                     f.write(new_content)
                 modified = True
-                author = next((s.get("blame_author") for s in issues_summary if s["file"] == fp), None)
+                author = file_author_map.get(fp)
                 author_str = f"（提交人：{author}）" if author else ""
                 fix_descs.append(f"- [{sev}] `{fp}`{author_str}: {fix['issue_desc']}")
                 if author and author != "-":
@@ -385,29 +438,28 @@ def main():
     else:
         print("ℹ️ 未发现可直接自动修复的代码缺陷")
 
-    # ── Step 4：仅对涉及业务缺陷的问题提 Issue（>10条才分批，<=10条提1个Issue） ─
-    if need_review:
-        # 补全 blame 作者
-        for item in need_review:
+    # ── Step 5：仅对涉及业务缺陷的问题提 Issue（>10条才分批，<=10条提1个Issue） ─
+    if all_need_review:
+        for item in all_need_review:
             fp = item.get("file_path", "")
-            item["blame_author"] = next((s.get("blame_author") for s in issues_summary if s["file"] == fp), None)
+            item["blame_author"] = file_author_map.get(fp)
 
-        total_review = len(need_review)
+        total_review = len(all_need_review)
         print(f"\n⚠️ 发现 {total_review} 个真正涉及业务逻辑的缺陷，正在生成 Issue...")
 
         if total_review <= 10:
             title = f"⚠️ [Sonar 待决策] 涉及业务逻辑的代码缺陷（共 {total_review} 项）"
-            create_review_issue(repo, headers, need_review, title, 1, 1)
+            create_review_issue(repo, headers, all_need_review, title, 1, 1)
         else:
             batch_size = 10
-            batches = [need_review[i:i+batch_size] for i in range(0, total_review, batch_size)]
-            for idx, batch in enumerate(batches, 1):
-                title = f"⚠️ [Sonar 待决策] 涉及业务代码缺陷（第 {idx}/{len(batches)} 批，共 {len(batch)} 项）"
-                create_review_issue(repo, headers, batch, title, idx, len(batches))
+            review_batches = [all_need_review[i:i+batch_size] for i in range(0, total_review, batch_size)]
+            for idx, r_batch in enumerate(review_batches, 1):
+                title = f"⚠️ [Sonar 待决策] 涉及业务代码缺陷（第 {idx}/{len(review_batches)} 批，共 {len(r_batch)} 项）"
+                create_review_issue(repo, headers, r_batch, title, idx, len(review_batches))
     else:
-        print("🎉 没有需要人工审核的复杂业务缺陷！不需要打扰开发者！")
+        print("🎉 没有需要人工审核的复杂业务缺陷！")
 
-    print("\n✅ 流水线治理分析完成！")
+    print("\n✅ 全部批次流水线治理完成！")
 
 if __name__ == "__main__":
     main()
