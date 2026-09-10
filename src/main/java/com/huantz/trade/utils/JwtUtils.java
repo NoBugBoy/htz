@@ -7,7 +7,6 @@ import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -39,17 +38,13 @@ public class JwtUtils {
     // 拷贝一份，避免修改调用方传入的 Map（调用方可能传 Map.of 等不可变 Map）
     Map<String, Object> payload = new HashMap<>(claims);
     Instant now = Instant.now();
-    Date nowDate = Date.from(now);
-    Date expiresAt = Date.from(now.plus(TOKEN_TTL));
-    // 签发时间 / 过期时间：同时放进 claims 与 builder，保证解析后 exp 单位为秒（JJWT 规范）
-    payload.put("iat", nowDate);
-    payload.put("exp", expiresAt);
+    // 签发时间 / 过期时间：以秒级时间戳写入 claims（JJWT 规范，解析后自动还原为日期）
+    payload.put("iat", now.getEpochSecond());
+    payload.put("exp", now.plus(TOKEN_TTL).getEpochSecond());
     return Jwts.builder()
         .subject(String.valueOf(userId))
         .claims(payload)
         .id(UUID.randomUUID().toString()) // jti：每个 token 唯一，用于退出登录后的服务端失效
-        .issuedAt(nowDate)
-        .expiration(expiresAt)
         .signWith(privateKey, Jwts.SIG.RS256) // 👈 核心：使用私钥签发 RS256
         .compact();
   }
