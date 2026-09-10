@@ -90,7 +90,8 @@ class SectServiceImplTest {
   void updateNotFound() {
     when(sectRepository.findById(1L)).thenReturn(Optional.empty());
 
-    assertThatThrownBy(() -> service.update(1L, new SectRequest("Sect 2")))
+    SectRequest updateRequest = new SectRequest("Sect 2");
+    assertThatThrownBy(() -> service.update(1L, updateRequest))
         .isInstanceOf(BusinessException.class)
         .hasMessageContaining("该数据已经被删除");
   }
