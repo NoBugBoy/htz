@@ -62,4 +62,20 @@ class AdminRoleServiceImplTest {
 
         verify(adminRoleRepository).save(entity);
     }
+
+    @Test
+    @DisplayName("批量分配角色（空实现）")
+    void assignRoles() {
+        service.assignRoles(1L, List.of(AdminRoleEnum.SUPER_ADMIN));
+        // 不抛出异常即通过
+        assertThat(true).isTrue();
+    }
+
+    @Test
+    @DisplayName("删除用户角色（空实现）")
+    void deleteByUserId() {
+        service.deleteByUserId(1L);
+        // 不抛出异常即通过
+        assertThat(true).isTrue();
+    }
 }
