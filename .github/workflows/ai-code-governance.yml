@@ -51,7 +51,7 @@ jobs:
           python-version: '3.10'
 
       - name: Install Dependencies
-        run: "pip install --only-binary :all: requests==2.32.3 openai==1.55.0"
+        run: "pip install --only-binary :all: requests==2.32.3 httpx==0.27.2 openai==1.55.0"
 
       # 1. 编译并推送分析到 SonarCloud（核心步骤）
       - name: Build and analyze with SonarCloud
