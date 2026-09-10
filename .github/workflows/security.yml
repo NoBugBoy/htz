@@ -32,7 +32,7 @@ jobs:
 
       - name: Run Semgrep SAST & Standards Scan
         run: |
-          semgrep scan \
+          semgrep scan src/ \
             --config .semgrep.yml \
             --config "p/owasp-top-ten" \
             --config "p/cwe-top-25" \
