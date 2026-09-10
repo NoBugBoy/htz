@@ -9,7 +9,6 @@ permissions:
   contents: write        # git push 新分支
   pull-requests: write   # 创建 PR
   issues: write          # 回复 Issue 评论
-  workflows: write       # 允许创建/更新 workflow 文件
 
 env:
   ACTIONS_RUNNER_FORCE_NODE24: "true"

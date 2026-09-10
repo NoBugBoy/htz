@@ -369,7 +369,7 @@ def main():
     )
 
     system_prompt = """
-你是一名极其资深的架构师与代码安全专家。针对 SonarCloud 发现的代码缺陷（包括 Java 代码、测试用例以及 .github/ 工作流等配置）进行分流与自动修复。
+你是一名极其资深的架构师与代码安全专家。针对 SonarCloud 发现的代码缺陷（包括 Java 代码、测试用例等）进行分流与自动修复。
 必须全部使用简体中文输出！
 
 【输入格式】：
@@ -377,9 +377,10 @@ def main():
 请结合该文件的上下文，对其中的各个缺陷进行分析与修复。
 
 【极简原则】：
-1. 绝大部分非业务缺陷（单行或几行即可解决的代码异味、安全编码规范、工作流配置安全、死代码、空指针等），全部放入 auto_fix_list 自动修复！包含所有严重级别（BLOCKER, CRITICAL, MAJOR, MINOR, INFO）。
-2. 只有真正涉及核心业务流程变化、可能改变业务功能行为、需要产品研发决策的疑难缺陷，才放入 need_review_list 提 Issue 人工审核！
-3. 测试类误报或完全无需修改的放入 ignore_list。
+1. 绝大部分非业务代码缺陷（单行或几行即可解决的代码异味、安全编码规范、死代码、空指针等），全部放入 auto_fix_list 自动修复！包含所有严重级别（BLOCKER, CRITICAL, MAJOR, MINOR, INFO）。
+2. 【严格限制】：严禁将 `.github/workflows/` 目录下的任何工作流文件放入 auto_fix_list！（因为 GitHub 安全限制禁止 GITHUB_TOKEN 修改工作流，否则会导致 Git Push 被拒绝）。对于工作流相关缺陷，必须放入 need_review_list 提 Issue 人工审核处理！
+3. 只有真正涉及核心业务流程变化、可能改变业务功能行为、需要产品研发决策的疑难缺陷，以及 .github/workflows/ 工作流文件缺陷，才放入 need_review_list 提 Issue 人工审核！
+4. 测试类误报或完全无需修改的放入 ignore_list。
 
 严格输出以下格式的 JSON，不要包含任何 markdown 标记：
 {
@@ -410,7 +411,6 @@ def main():
 }
 
 【常见自动修复标准（一律放入 auto_fix_list）】：
-- GitHub Actions 工作流安全缺陷（如 S8541、S8544）：`pip install` 缺少 `--only-binary :all:` 或未锁定依赖版本，修改为锁定具体版本并添加 `--only-binary :all:`，同时必须固定 `httpx==0.27.2`（否则 httpx>=0.28 会与 openai 产生 proxies 兼容性报错），注意在 YAML 中必须加上双引号（如 `"pip install --only-binary :all: requests==2.32.3 httpx==0.27.2 openai==1.55.0"`）以防止冒号引发 YAML 语法错误！
 - 枚举命名规范（S115）：枚举常量名不能以下划线开头，规范重命名（如 `_163` 改为 `MAIL_163`）！
 - 重复字符串字面量（S1192）：复用已定义的常量（如复用 `TIMESTAMP` 代替硬编码 `"timestamp"`）！
 - 同一行声明多个变量（S1659）：拆分为独立行分别声明（如 `String openid, unionId;` 拆为两行声明）！
@@ -476,6 +476,10 @@ def main():
             fixes_by_file[fix["file_path"]].append(fix)
 
         for fp, file_fixes in fixes_by_file.items():
+            if fp.startswith(".github/workflows/"):
+                print(f"  ⚠️ 跳过工作流配置自动修复（GitHub 安全机制禁止 GITHUB_TOKEN 修改工作流）: {fp}")
+                continue
+
             # 同文件内从最后一行往前替换，保证前面行号不受影响
             file_fixes_sorted = sorted(file_fixes, key=lambda x: x.get("start_line", 0), reverse=True)
             for fix in file_fixes_sorted:
@@ -505,9 +509,14 @@ def main():
         if modified:
             print("🎨 执行 Spotless 格式化...")
             run_cmd("mvn spotless:apply -q || ./gradlew spotlessApply || true")
+            # 严格确保还原并排除工作流文件，避免 push 被 GitHub 拒绝
+            run_cmd("git checkout -- .github/workflows/ 2>/dev/null || true")
             run_cmd("git config user.name 'github-actions[bot]'")
             run_cmd("git config user.email 'github-actions[bot]@users.noreply.github.com'")
-            run_cmd("git add .")
+            run_cmd("git add src/ pom.xml")
+            for fp in fixes_by_file.keys():
+                if not fp.startswith(".github/workflows/") and os.path.exists(fp):
+                    run_cmd(f"git add '{fp}'")
             run_cmd(f"git commit -m 'fix: AI 自动批量修复 {len(fix_descs)} 项非业务代码缺陷 [skip ci]'")
             run_cmd(f"git push origin {branch_name} --force")
 

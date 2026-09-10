@@ -321,9 +321,11 @@ def main():
 
         # ── Step 7：git 提交 + 推送 ───────────────────────────────────────────
         print(f"📤 正在提交并推送分支 {branch_name}...")
+        # 严格确保还原并排除工作流文件，避免 push 被 GitHub 拒绝
+        run_cmd("git checkout -- .github/workflows/ 2>/dev/null || true")
         run_cmd("git config user.name 'github-actions[bot]'")
         run_cmd("git config user.email 'github-actions[bot]@users.noreply.github.com'")
-        run_cmd("git add .")
+        run_cmd("git add src/ pom.xml")
         commit_out = run_cmd(
             f"git commit -m 'fix: AI 根据 Issue #{issue_number} 修复 Sonar 缺陷（第 {batch_index} 批） [skip ci]'"
         )
