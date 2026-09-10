@@ -156,11 +156,11 @@ def main():
             run_cmd("git commit -m 'chore: AI 自动修复已知微小代码异味与隐患'")
             run_cmd(f"git push origin {branch_name} --force")
 
-            # 调用 GitHub API 发起 PR，base 设定为 htz
+            target_branch = os.environ.get("SONAR_BRANCH") or os.environ.get("GITHUB_REF_NAME") or "hook"
             pr_payload = {
                 "title": "🤖 [AI Auto-Fix] 修复低风险代码异味及安全缺陷",
                 "head": branch_name,
-                "base": "htz",
+                "base": target_branch,
                 "body": (
                     "### AI 自动修复报告\n"
                     "本 PR 由 AI 自动扫描并完成修复，已通过 Spotless 格式化，请 Code Review 后合并。\n\n"

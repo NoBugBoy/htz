@@ -40,7 +40,7 @@ jobs:
           python-version: '3.10'
 
       - name: Install Dependencies
-        run: pip install requests openai
+        run: pip install --only-binary :all: requests==2.32.3 openai==1.55.0
 
       - name: Apply Solution and Open PR
         env:
@@ -48,6 +48,7 @@ jobs:
           AI_API_KEY: ${{ secrets.AI_API_KEY }}
           AI_BASE_URL: ${{ secrets.AI_BASE_URL || 'https://api.deepseek.com/v1' }}
           AI_MODEL: ${{ secrets.AI_MODEL || 'deepseek-v4-flash' }}
+          TARGET_BRANCH: ${{ vars.TARGET_BRANCH || 'hook' }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
           ISSUE_BODY: ${{ github.event.issue.body }}
           ISSUE_TITLE: ${{ github.event.issue.title }}

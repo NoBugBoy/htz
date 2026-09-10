@@ -174,43 +174,21 @@ def ensure_label_exists(repo, headers, label_name, color="e11d48", description="
     if res.status_code not in (201, 422):
         print(f"⚠️ 创建 label 失败: {res.status_code} {res.text}")
 
-def is_low_or_info(iss):
-    """
-    判断缺陷是否属于 LOW 或 INFO 级别（不处理）：
-    1. 优先根据 SonarCloud 新版 Clean Code impacts（HIGH, MEDIUM, LOW）判断；
-    2. 若无 impacts，按传统 severity（MINOR 对应 LOW，INFO 对应 INFO）判断。
-    """
-    impacts = iss.get("impacts", [])
-    if impacts:
-        severities = {imp.get("severity", "").upper() for imp in impacts}
-        if any(s in ("HIGH", "MEDIUM", "BLOCKER", "CRITICAL", "MAJOR") for s in severities):
-            return False
-        return True
-
-    sev = iss.get("severity", "").upper()
-    return sev in ("MINOR", "INFO", "LOW")
-
 def fetch_all_sonar_issues(sonar_token, project_key, branch=None):
-    """拉取未解决缺陷（排除 LOW/INFO 级别，仅保留 HIGH 和 MEDIUM 重点缺陷）"""
+    """拉取未解决缺陷（全量包含所有严重级别与文件类型）"""
     all_issues = []
     page, page_size = 1, 100
-    use_impact_param = True
 
     while True:
-        impact_param = "&impactSeverities=HIGH,MEDIUM" if use_impact_param else ""
         url = (
             f"https://sonarcloud.io/api/issues/search"
-            f"?componentKeys={project_key}&issueStatuses=OPEN,CONFIRMED{impact_param}&ps={page_size}&p={page}"
+            f"?componentKeys={project_key}&issueStatuses=OPEN,CONFIRMED&ps={page_size}&p={page}"
         )
         if branch:
             url += f"&branch={branch}"
 
         res = requests.get(url, auth=(sonar_token, ""))
         if res.status_code != 200:
-            if use_impact_param:
-                print(f"⚠️ impactSeverities 参数不受支持，降级为全量拉取后本地过滤...")
-                use_impact_param = False
-                continue
             print(f"❌ SonarCloud API 请求失败 (第{page}页): {res.text}")
             break
 
@@ -223,19 +201,8 @@ def fetch_all_sonar_issues(sonar_token, project_key, branch=None):
             break
         page += 1
 
-    # 过滤掉 .github/ 目录以及 LOW / INFO 级别的缺陷
-    valid_issues = []
-    for iss in all_issues:
-        raw_path = iss.get("component", "")
-        file_path = raw_path.split(":")[-1] if ":" in raw_path else raw_path
-        if file_path.startswith(".github/"):
-            continue
-        if is_low_or_info(iss):
-            continue
-        valid_issues.append(iss)
-
-    valid_issues.sort(key=lambda x: SEVERITY_ORDER.get(x.get("severity", "MAJOR"), 99))
-    return valid_issues
+    all_issues.sort(key=lambda x: SEVERITY_ORDER.get(x.get("severity", "MAJOR"), 99))
+    return all_issues
 
 def build_file_grouped_batches(issues, repo, headers, sha_cache, batch_size=20):
     """
@@ -401,7 +368,7 @@ def main():
     )
 
     system_prompt = """
-你是一名极其资深的 Java 架构师。针对 SonarCloud 发现的代码缺陷进行分流与自动修复。
+你是一名极其资深的架构师与代码安全专家。针对 SonarCloud 发现的代码缺陷（包括 Java 代码、测试用例以及 .github/ 工作流等配置）进行分流与自动修复。
 必须全部使用简体中文输出！
 
 【输入格式】：
@@ -409,8 +376,8 @@ def main():
 请结合该文件的上下文，对其中的各个缺陷进行分析与修复。
 
 【极简原则】：
-1. 绝大部分非业务缺陷（单行或几行即可解决的代码异味、安全编码规范、死代码、空指针等），全部放入 auto_fix_list 自动修复！
-2. 只有真正涉及核心业务流程变化、可能改变功能行为、需要产品研发决策的疑难缺陷，才放入 need_review_list 提 Issue 人工审核！
+1. 绝大部分非业务缺陷（单行或几行即可解决的代码异味、安全编码规范、工作流配置安全、死代码、空指针等），全部放入 auto_fix_list 自动修复！包含所有严重级别（BLOCKER, CRITICAL, MAJOR, MINOR, INFO）。
+2. 只有真正涉及核心业务流程变化、可能改变业务功能行为、需要产品研发决策的疑难缺陷，才放入 need_review_list 提 Issue 人工审核！
 3. 测试类误报或完全无需修改的放入 ignore_list。
 
 严格输出以下格式的 JSON，不要包含任何 markdown 标记：
@@ -441,6 +408,13 @@ def main():
 }
 
 【常见自动修复标准（一律放入 auto_fix_list）】：
+- GitHub Actions 工作流安全缺陷（如 S8541、S8544）：`pip install` 缺少 `--only-binary :all:` 或未锁定依赖版本，修改为锁定具体版本并添加 `--only-binary :all:`（如 `pip install --only-binary :all: requests==2.32.3 openai==1.55.0`）！
+- 枚举命名规范（S115）：枚举常量名不能以下划线开头，规范重命名（如 `_163` 改为 `MAIL_163`）！
+- 重复字符串字面量（S1192）：复用已定义的常量（如复用 `TIMESTAMP` 代替硬编码 `"timestamp"`）！
+- 同一行声明多个变量（S1659）：拆分为独立行分别声明（如 `String openid, unionId;` 拆为两行声明）！
+- 未指定时区获取当前时间（S8688）：`LocalDateTime.now()` 显式指定时区为 `LocalDateTime.now(ZoneId.systemDefault())`！
+- 遗留 Date API（S2143）：改用现代 `java.time` API（如 `Instant.now()`、`Duration` 等）！
+- 测试异常断言内部多次方法调用（S5778）：将可能抛异常的方法入参构造移出 lambda 外！
 - 明显的致错空指针（如方法形参被置空 `request = null;`、`user = null;`），直接将该置空语句整行删除（fixed_snippet 传 ""）！
 - 无用局部变量与死代码（如 `String rawSql = ...;`、`String hardcodedJwtSecret = ...;` 未使用），直接整行删除！
 - 注释掉的代码块（S125），直接删除！
@@ -527,14 +501,15 @@ def main():
             run_cmd(f"git commit -m 'fix: AI 自动批量修复 {len(fix_descs)} 项非业务代码缺陷 [skip ci]'")
             run_cmd(f"git push origin {branch_name} --force")
 
+            target_branch = branch or "hook"
             author_notice = (
                 f"\n\n> 📢 **涉及代码提交人**：{' '.join(sorted(pr_authors))} 请关注此 PR。"
                 if pr_authors else ""
             )
             pr_payload = {
-                "title": f"🤖 [Sonar+AI Auto-Fix] 自动批量修复 {len(fix_descs)} 项代码缺陷 [skip ci]",
+                "title": f"🤖 [Sonar+AI Auto-Fix] 自动批量修复 {len(fix_descs)} 项代码缺陷",
                 "head":  branch_name,
-                "base":  "htz",
+                "base":  target_branch,
                 "body":  (
                     f"### SonarCloud 代码缺陷自动批量修复报告\n"
                     f"本次流水线共自动识别并消除了 **{len(fix_descs)}** 项非业务代码缺陷/安全隐患，已执行 Spotless 格式化。\n\n"
@@ -554,7 +529,7 @@ def main():
 
                 summary_md = (
                     f"**📦 仓库：** `{repo}`\n"
-                    f"**🌿 目标分支：** `htz`\n"
+                    f"**🌿 目标分支：** `{target_branch}`\n"
                     f"**🛠️ 消除缺陷：** 本次自动批量消除 **{len(fix_descs)}** 项核心代码缺陷\n"
                     f"**📢 涉及提交人：** {authors_str}\n\n"
                     f"---\n"

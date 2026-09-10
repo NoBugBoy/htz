@@ -10,6 +10,7 @@ on:
     paths:
       - 'src/**'       # 只有 src 目录下的代码变动才触发
       - 'pom.xml'      # 或 build.gradle
+      - '.github/**'   # 包含 .github 变动触发
 
 # 显式声明所需权限
 permissions:
@@ -50,7 +51,7 @@ jobs:
           python-version: '3.10'
 
       - name: Install Dependencies
-        run: pip install requests openai
+        run: pip install --only-binary :all: requests==2.32.3 openai==1.55.0
 
       # 1. 编译并推送分析到 SonarCloud（核心步骤）
       - name: Build and analyze with SonarCloud

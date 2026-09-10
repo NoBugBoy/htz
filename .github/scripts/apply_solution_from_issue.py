@@ -340,10 +340,11 @@ def main():
             if pr_authors else ""
         )
         fix_detail = "\n".join(fix_descs)
+        target_branch = os.environ.get("TARGET_BRANCH") or "hook"
         pr_payload = {
-            "title": f"🤖 [AI Fix] Issue #{issue_number} Sonar 缺陷修复（第 {batch_index}/{total_batches} 批，项 {indices_str}） [skip ci]",
+            "title": f"🤖 [AI Fix] Issue #{issue_number} Sonar 缺陷修复（第 {batch_index}/{total_batches} 批，项 {indices_str}）",
             "head":  branch_name,
-            "base":  "htz",
+            "base":  target_branch,
             "body":  (
                 f"关联并关闭 Issue: #{issue_number}（第 {batch_index}/{total_batches} 批）\n"
                 f"开发者指令：`{comment_body.strip()}`\n\n"
