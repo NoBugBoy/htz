@@ -21,6 +21,14 @@ env:
 
 jobs:
   sonar-and-ai:
+    # 过滤掉包含 [skip ci] 以及 AI 自动修复 PR 的合并提交，防止合并后循环触发
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (!contains(github.event.head_commit.message, '[skip ci]') &&
+       !contains(github.event.head_commit.message, '[ci skip]') &&
+       !contains(github.event.head_commit.message, 'ai-fix-') &&
+       !startsWith(github.event.head_commit.message, 'fix: AI 根据 Issue') &&
+       !startsWith(github.event.head_commit.message, 'fix: AI 自动批量修复'))
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
@@ -50,7 +58,7 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: |
           mvn -B clean verify org.sonarsource.scanner.maven:sonar-maven-plugin:sonar \
-            -Dsonar.projectKey=nobugboy \
+            -Dsonar.projectKey=NoBugBoy_htz \
             -Dsonar.organization=nobugboy \
             -Dsonar.host.url=https://sonarcloud.io \
             -DskipTests=true
@@ -60,7 +68,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_PROJECT_KEY: nobugboy
+          SONAR_PROJECT_KEY: NoBugBoy_htz
+          GITHUB_REF_NAME: ${{ github.ref_name }}
           AI_API_KEY: ${{ secrets.AI_API_KEY }}
           AI_BASE_URL: ${{ secrets.AI_BASE_URL || 'https://api.deepseek.com/v1' }}
           AI_MODEL: ${{ secrets.AI_MODEL || 'deepseek-v4-flash' }}

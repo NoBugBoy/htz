@@ -325,7 +325,7 @@ def main():
         run_cmd("git config user.email 'github-actions[bot]@users.noreply.github.com'")
         run_cmd("git add .")
         commit_out = run_cmd(
-            f"git commit -m 'fix: AI 根据 Issue #{issue_number} 修复 Sonar 缺陷（第 {batch_index} 批）'"
+            f"git commit -m 'fix: AI 根据 Issue #{issue_number} 修复 Sonar 缺陷（第 {batch_index} 批） [skip ci]'"
         )
         print(f"  commit: {commit_out[:80]}")
 
@@ -341,7 +341,7 @@ def main():
         )
         fix_detail = "\n".join(fix_descs)
         pr_payload = {
-            "title": f"🤖 [AI Fix] Issue #{issue_number} Sonar 缺陷修复（第 {batch_index}/{total_batches} 批，项 {indices_str}）",
+            "title": f"🤖 [AI Fix] Issue #{issue_number} Sonar 缺陷修复（第 {batch_index}/{total_batches} 批，项 {indices_str}） [skip ci]",
             "head":  branch_name,
             "base":  "htz",
             "body":  (

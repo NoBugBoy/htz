@@ -174,35 +174,71 @@ def ensure_label_exists(repo, headers, label_name, color="e11d48", description="
     if res.status_code not in (201, 422):
         print(f"⚠️ 创建 label 失败: {res.status_code} {res.text}")
 
-def fetch_all_sonar_issues(sonar_token, project_key):
-    """拉取全量未解决缺陷（忽略最低级别 MINOR 和 INFO，仅拉取 BLOCKER, CRITICAL, MAJOR）"""
+def is_low_or_info(iss):
+    """
+    判断缺陷是否属于 LOW 或 INFO 级别（不处理）：
+    1. 优先根据 SonarCloud 新版 Clean Code impacts（HIGH, MEDIUM, LOW）判断；
+    2. 若无 impacts，按传统 severity（MINOR 对应 LOW，INFO 对应 INFO）判断。
+    """
+    impacts = iss.get("impacts", [])
+    if impacts:
+        severities = {imp.get("severity", "").upper() for imp in impacts}
+        if any(s in ("HIGH", "MEDIUM", "BLOCKER", "CRITICAL", "MAJOR") for s in severities):
+            return False
+        return True
+
+    sev = iss.get("severity", "").upper()
+    return sev in ("MINOR", "INFO", "LOW")
+
+def fetch_all_sonar_issues(sonar_token, project_key, branch=None):
+    """拉取未解决缺陷（排除 LOW/INFO 级别，仅保留 HIGH 和 MEDIUM 重点缺陷）"""
     all_issues = []
     page, page_size = 1, 100
+    use_impact_param = True
+
     while True:
+        impact_param = "&impactSeverities=HIGH,MEDIUM" if use_impact_param else ""
         url = (
             f"https://sonarcloud.io/api/issues/search"
-            f"?componentKeys={project_key}&resolved=false&ps={page_size}&p={page}"
-            f"&severities=BLOCKER,CRITICAL,MAJOR"
+            f"?componentKeys={project_key}&issueStatuses=OPEN,CONFIRMED{impact_param}&ps={page_size}&p={page}"
         )
+        if branch:
+            url += f"&branch={branch}"
+
         res = requests.get(url, auth=(sonar_token, ""))
         if res.status_code != 200:
+            # 若带 impactSeverities 报错（例如旧版接口），尝试关闭该参数降级拉取并在内存过滤
+            if use_impact_param:
+                print(f"⚠️ impactSeverities 参数不受支持，降级为全量拉取后本地过滤...")
+                use_impact_param = False
+                continue
+
+            # 若指定 branch 失败，自动降级为默认/主分支检索
+            if branch:
+                print(f"⚠️ 携带 branch={branch} 请求失败 (状态码 {res.status_code})，尝试不带 branch 请求...")
+                branch = None
+                continue
+
             print(f"❌ SonarCloud API 请求失败 (第{page}页): {res.text}")
             break
+
         data   = res.json()
         issues = data.get("issues", [])
         all_issues.extend(issues)
         total  = data.get("total", 0)
-        print(f"  已获取 {len(all_issues)}/{total} 条重点缺陷...")
-        if len(all_issues) >= total or not issues or len(all_issues) >= 200:
+        print(f"  已获取 {len(all_issues)}/{total} 条缺陷...")
+        if len(all_issues) >= total or not issues:
             break
         page += 1
 
-    # 过滤掉 .github/ 目录下的配置告警，仅保留真实业务与代码工程文件
+    # 过滤掉 .github/ 目录以及 LOW / INFO 级别的缺陷
     valid_issues = []
     for iss in all_issues:
         raw_path = iss.get("component", "")
         file_path = raw_path.split(":")[-1] if ":" in raw_path else raw_path
         if file_path.startswith(".github/"):
+            continue
+        if is_low_or_info(iss):
             continue
         valid_issues.append(iss)
 
@@ -344,7 +380,8 @@ def create_review_issue(repo, headers, batch_issues, batch_title, batch_idx, tot
 
 def main():
     sonar_token = os.environ.get("SONAR_TOKEN")
-    project_key = os.environ.get("SONAR_PROJECT_KEY")
+    project_key = os.environ.get("SONAR_PROJECT_KEY", "NoBugBoy_htz")
+    branch      = os.environ.get("GITHUB_REF_NAME") or os.environ.get("BRANCH_NAME")
     repo        = os.environ["GITHUB_REPOSITORY"]
     gh_token    = os.environ["GITHUB_TOKEN"]
     headers     = {"Authorization": f"Bearer {gh_token}", "Accept": "application/vnd.github.v3+json"}
@@ -353,12 +390,12 @@ def main():
 
     ensure_label_exists(repo, headers, "ai-needs-decision")
 
-    # ── Step 1：拉取所有非最低级别（BLOCKER, CRITICAL, MAJOR）的缺陷 ────────
-    print("📡 正在从 SonarCloud 拉取核心缺陷（已忽略 MINOR/INFO 级别）...")
-    raw_issues = fetch_all_sonar_issues(sonar_token, project_key)
+    # ── Step 1：拉取全量未解决缺陷（对齐 SonarCloud 网页端 OPEN / CONFIRMED） ────────
+    print(f"📡 正在从 SonarCloud 拉取未解决缺陷 (projectKey={project_key}, branch={branch or '默认'})...")
+    raw_issues = fetch_all_sonar_issues(sonar_token, project_key, branch)
 
     if not raw_issues:
-        print("✅ SonarCloud 显示项目无任何高/中危缺陷！")
+        print("✅ SonarCloud 显示项目无任何未解决缺陷！")
         return
 
     # ── Step 2：按文件聚合装箱（每批约20个，相同文件强绑定同组，极省Token） ──
@@ -495,7 +532,7 @@ def main():
             run_cmd("git config user.name 'github-actions[bot]'")
             run_cmd("git config user.email 'github-actions[bot]@users.noreply.github.com'")
             run_cmd("git add .")
-            run_cmd(f"git commit -m 'fix: AI 自动批量修复 {len(fix_descs)} 项非业务代码缺陷'")
+            run_cmd(f"git commit -m 'fix: AI 自动批量修复 {len(fix_descs)} 项非业务代码缺陷 [skip ci]'")
             run_cmd(f"git push origin {branch_name} --force")
 
             author_notice = (
@@ -503,7 +540,7 @@ def main():
                 if pr_authors else ""
             )
             pr_payload = {
-                "title": f"🤖 [Sonar+AI Auto-Fix] 自动批量修复 {len(fix_descs)} 项代码缺陷",
+                "title": f"🤖 [Sonar+AI Auto-Fix] 自动批量修复 {len(fix_descs)} 项代码缺陷 [skip ci]",
                 "head":  branch_name,
                 "base":  "htz",
                 "body":  (
