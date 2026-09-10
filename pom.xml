@@ -286,13 +286,9 @@
                             <goal>prepare-agent</goal>
                         </goals>
                         <configuration>
-                            <excludes>
-                                <exclude>java/**</exclude>
-                                <exclude>javax/**</exclude>
-                                <exclude>sun/**</exclude>
-                                <exclude>jdk/**</exclude>
-                                <exclude>org/springframework/**</exclude>
-                            </excludes>
+                            <includes>
+                                <include>com/huantz/trade/**</include>
+                            </includes>
                         </configuration>
                     </execution>
                     <execution>
