@@ -289,6 +289,10 @@
                             <includes>
                                 <include>com/huantz/trade/**</include>
                             </includes>
+                            <excludes>
+                                <exclude>*MockitoMock*</exclude>
+                                <exclude>*ByteBuddy*</exclude>
+                            </excludes>
                         </configuration>
                     </execution>
                     <execution>

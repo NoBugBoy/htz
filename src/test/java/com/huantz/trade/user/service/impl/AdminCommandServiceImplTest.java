@@ -9,7 +9,7 @@ import com.huantz.trade.common.cache.CacheHelper;
 import com.huantz.trade.exception.BusinessException;
 import com.huantz.trade.user.cache.AccountCacheKey;
 import com.huantz.trade.user.mapper.admin.AdminEntityMapper;
-import com.huantz.trade.user.model.dto.AdminRestPasswordDto;
+import com.huantz.trade.user.model.dto.AdminResetPasswordDTO;
 import com.huantz.trade.user.model.entity.AdminEntity;
 import com.huantz.trade.user.repository.AdminRepository;
 import java.util.List;
@@ -103,7 +103,7 @@ class AdminCommandServiceImplTest {
   @Test
   @DisplayName("重置密码 (OTT) - 用户不存在")
   void resetPasswordOttUserNotFound() {
-    AdminRestPasswordDto dto = new AdminRestPasswordDto("test@test.com", "new");
+    AdminResetPasswordDTO dto = new AdminResetPasswordDTO("test@test.com", "new");
     when(cacheHelper.getAndEvict(AccountCacheKey.OTT_RESET_PASSWORD, "valid"))
         .thenReturn(Optional.of(dto));
     when(adminRepository.findByEmail("test@test.com")).thenReturn(Optional.empty());
@@ -116,7 +116,7 @@ class AdminCommandServiceImplTest {
   @Test
   @DisplayName("重置密码 (OTT) - 成功")
   void resetPasswordOttSuccess() {
-    AdminRestPasswordDto dto = new AdminRestPasswordDto("test@test.com", "new");
+    AdminResetPasswordDTO dto = new AdminResetPasswordDTO("test@test.com", "new");
     when(cacheHelper.getAndEvict(AccountCacheKey.OTT_RESET_PASSWORD, "valid"))
         .thenReturn(Optional.of(dto));
 
