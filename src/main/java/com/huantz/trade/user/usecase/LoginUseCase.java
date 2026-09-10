@@ -35,7 +35,8 @@ public class LoginUseCase implements UseCase<LoginCommand, String> {
   @Override
   public String execute(LoginCommand loginCommand) {
     final var loginCode = loginCommand.loginCode();
-    String openid, unionId;
+    String openid;
+    String unionId;
 
     try {
       var sessionInfo = wxMaService.getUserService().getSessionInfo(loginCode);
