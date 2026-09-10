@@ -373,7 +373,7 @@ def create_review_issue(repo, headers, batch_issues, batch_title, batch_idx, tot
 def main():
     sonar_token = os.environ.get("SONAR_TOKEN")
     project_key = os.environ.get("SONAR_PROJECT_KEY", "NoBugBoy_htz")
-    branch      = os.environ.get("SONAR_BRANCH") or os.environ.get("GITHUB_REF_NAME") or "main"
+    branch      = os.environ.get("SONAR_BRANCH") or os.environ.get("GITHUB_REF_NAME")
     repo        = os.environ["GITHUB_REPOSITORY"]
     gh_token    = os.environ["GITHUB_TOKEN"]
     headers     = {"Authorization": f"Bearer {gh_token}", "Accept": "application/vnd.github.v3+json"}

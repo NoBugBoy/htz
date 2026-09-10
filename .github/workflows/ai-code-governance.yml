@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - htz          # 当代码 push 到 htz 分支时立即自动触发
+      - hook         # 当前测试分支
       - main         # 如果后续切回 main 也会触发
     paths:
       - 'src/**'       # 只有 src 目录下的代码变动才触发
@@ -69,7 +70,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_PROJECT_KEY: NoBugBoy_htz
-          SONAR_BRANCH: main
+          SONAR_BRANCH: ${{ vars.SONAR_BRANCH || github.ref_name }}
           AI_API_KEY: ${{ secrets.AI_API_KEY }}
           AI_BASE_URL: ${{ secrets.AI_BASE_URL || 'https://api.deepseek.com/v1' }}
           AI_MODEL: ${{ secrets.AI_MODEL || 'deepseek-v4-flash' }}
