@@ -1,0 +1,40 @@
+name: Security & Code Standards Scan (Semgrep)
+
+on:
+  workflow_dispatch: # 支持网页手动触发
+  push:
+    branches:
+      - htz
+      - hook
+      - main
+    paths:
+      - 'src/**'
+      - '.semgrep.yml'
+      - '.github/workflows/security.yml'
+  pull_request:
+    branches:
+      - htz
+      - hook
+      - main
+    paths:
+      - 'src/**'
+      - '.semgrep.yml'
+
+jobs:
+  semgrep:
+    name: Semgrep SAST & Standards Check
+    runs-on: ubuntu-latest
+    container:
+      image: semgrep/semgrep
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run Semgrep SAST & Standards Scan
+        run: |
+          semgrep scan \
+            --config .semgrep.yml \
+            --config "p/owasp-top-ten" \
+            --config "p/cwe-top-25" \
+            --config "p/java" \
+            --error

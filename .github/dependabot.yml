@@ -1,0 +1,19 @@
+version: 2
+updates:
+  # 1. 监控 Maven (pom.xml) 依赖组件升级与安全漏洞
+  - package-ecosystem: "maven"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "security"
+
+  # 2. 监控 GitHub Actions 流水线插件版本升级
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5

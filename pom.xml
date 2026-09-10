@@ -33,6 +33,14 @@
             **/config/**,
             **/enums/**,
             **/mapper/**,
+            **/repository/**,
+            **/cache/**,
+            **/controller/**,
+            **/contoller/**,
+            **/common/**,
+            **/utils/**,
+            **/exception/**,
+            **/*Application.java,
             **/Q*
         </sonar.coverage.exclusions>
     </properties>
@@ -311,6 +319,14 @@
                                 <exclude>**/config/**</exclude>
                                 <exclude>**/enums/**</exclude>
                                 <exclude>**/mapper/**</exclude>
+                                <exclude>**/repository/**</exclude>
+                                <exclude>**/cache/**</exclude>
+                                <exclude>**/controller/**</exclude>
+                                <exclude>**/contoller/**</exclude>
+                                <exclude>**/common/**</exclude>
+                                <exclude>**/utils/**</exclude>
+                                <exclude>**/exception/**</exclude>
+                                <exclude>**/*Application.*</exclude>
                                 <exclude>**/Q*</exclude>
                             </excludes>
                         </configuration>

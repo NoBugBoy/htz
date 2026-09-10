@@ -55,6 +55,18 @@ class GameServerServiceImplTest {
   }
 
   @Test
+  @DisplayName("分页查询 - 有条件")
+  void pageWithCondition() {
+    GameServerPageRequest request = new GameServerPageRequest();
+    request.setGameServerName("Server 1");
+    when(repository.findAll(any(com.querydsl.core.types.Predicate.class), any(org.springframework.data.domain.Pageable.class)))
+        .thenReturn(new PageImpl<>(Collections.emptyList()));
+
+    Page<GameSeverPageResponse> result = service.page(request);
+    assertThat(result).isNotNull();
+  }
+
+  @Test
   @DisplayName("创建服务器 - 名称重复")
   void createDuplicate() {
     GameServerRequest request = new GameServerRequest("Server 1");

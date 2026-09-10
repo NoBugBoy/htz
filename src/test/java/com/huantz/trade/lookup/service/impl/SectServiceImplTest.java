@@ -55,6 +55,18 @@ class SectServiceImplTest {
   }
 
   @Test
+  @DisplayName("分页查询 - 有条件")
+  void pageWithCondition() {
+    SectPageRequest request = new SectPageRequest();
+    request.setSectName("Sect 1");
+    when(sectRepository.findAll(any(com.querydsl.core.types.Predicate.class), any(org.springframework.data.domain.Pageable.class)))
+        .thenReturn(new PageImpl<>(Collections.emptyList()));
+
+    Page<SectPageResponse> result = service.page(request);
+    assertThat(result).isNotNull();
+  }
+
+  @Test
   @DisplayName("删除门派")
   void deleteById() {
     service.deleteById(1L);

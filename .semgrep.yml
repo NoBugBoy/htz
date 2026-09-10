@@ -1,0 +1,79 @@
+rules:
+  # ==============================================================================
+  # 阿里巴巴 Java 开发规约 & Google Style 最佳实践规则集
+  # ==============================================================================
+
+  # 1. 日志规约：生产环境禁止直接使用 System.out / System.err
+  - id: alibaba-avoid-system-out
+    languages: [ java ]
+    message: "禁止直接使用 System.out/err 打印日志，容易导致日志混乱且无法按级别控制，必须使用日志门面（如 @Slf4j 配合 log.info/warn/error）。"
+    severity: ERROR
+    patterns:
+      - pattern-either:
+          - pattern: System.out.println(...)
+          - pattern: System.out.print(...)
+          - pattern: System.err.println(...)
+          - pattern: System.err.print(...)
+    paths:
+      exclude:
+        - src/test/**
+
+  # 2. 异常处理规约：禁止直接调用 e.printStackTrace()
+  - id: alibaba-avoid-print-stack-trace
+    languages: [ java ]
+    message: "禁止直接调用 e.printStackTrace()，否则在流量并发下容易因内部同步锁造成线程阻塞，且无法持久化日志，必须通过 log.error(\"...\", e) 输出异常。"
+    severity: ERROR
+    patterns:
+      - pattern: $E.printStackTrace(...)
+    paths:
+      exclude:
+        - src/test/**
+
+  # 3. 并发编程规约：禁止使用 Executors 快速创建线程池（极易发生 OOM）
+  - id: alibaba-avoid-executors-thread-pool
+    languages: [ java ]
+    message: "禁止使用 Executors 创建线程池。newFixedThreadPool/newSingleThreadExecutor 使用了无界队列 LinkedBlockingQueue，堆积请求会导致 OOM；newCachedThreadPool 允许创建无限个线程，也会导致 OOM。必须通过 ThreadPoolExecutor 显式传参创建。"
+    severity: ERROR
+    patterns:
+      - pattern-either:
+          - pattern: Executors.newFixedThreadPool(...)
+          - pattern: Executors.newCachedThreadPool(...)
+          - pattern: Executors.newSingleThreadExecutor(...)
+          - pattern: Executors.newScheduledThreadPool(...)
+
+  # 4. 时间日期规约：SimpleDateFormat 禁止使用大写 'YYYY' 跨年周
+  - id: alibaba-avoid-date-format-week-year
+    languages: [ java ]
+    message: "日期格式化时，年份禁止使用大写 'YYYY'。'YYYY' 表示 Week based year（当周所属年份），在每年年底与年初跨年周会导致算错年份（如 2023-12-31 会被格式化为 2024）。请统一使用小写 'yyyy'。"
+    severity: ERROR
+    patterns:
+      - pattern-either:
+          - pattern: new SimpleDateFormat($FMT, ...)
+          - pattern: DateTimeFormatter.ofPattern($FMT, ...)
+      - metavariable-regex:
+          metavariable: $FMT
+          regex: ".*YYYY.*"
+
+  # 5. 线程安全规约：严禁调用 Thread.stop() / suspend() / resume() 等高危废弃方法
+  - id: alibaba-avoid-thread-stop-suspend
+    languages: [ java ]
+    message: "禁止调用 Thread.stop()、Thread.suspend()、Thread.resume()，这些方法会直接释放锁导致数据状态不一致死锁，Java 官方已明确废弃。"
+    severity: ERROR
+    patterns:
+      - pattern-either:
+          - pattern: $T.stop()
+          - pattern: $T.suspend()
+          - pattern: $T.resume()
+
+  # 6. 安全规约：SQL 拼接防注入拦截
+  - id: alibaba-sql-injection-concatenation
+    languages: [ java ]
+    message: "严禁直接使用字符串拼接（+ 或 String.format）构造 SQL 语句传给数据库执行，存在致命的 SQL 注入风险，必须使用预编译占位符（? 或 JPA/QueryDSL 参数绑定）。"
+    severity: ERROR
+    patterns:
+      - pattern-either:
+          - pattern: $STMT.executeQuery($X + $Y)
+          - pattern: $STMT.executeUpdate($X + $Y)
+          - pattern: $STMT.execute($X + $Y)
+          - pattern: $EM.createQuery($X + $Y)
+          - pattern: $EM.createNativeQuery($X + $Y)
