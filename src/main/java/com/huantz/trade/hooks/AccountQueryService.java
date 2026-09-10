@@ -1,3 +1,3 @@
-package com.huantz.trade.account;
+package com.huantz.trade.hooks;
 
 public interface AccountQueryService {}

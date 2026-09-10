@@ -10,6 +10,66 @@ def run_cmd(cmd):
         print(f"[CMD WARN] {cmd}\n{res.stderr.strip()}")
     return res.stdout.strip()
 
+def send_feishu_card(webhook_url, title, summary_markdown, button_text=None, button_url=None, color="green"):
+    """
+    向飞书群机器人发送富文本互动卡片（Interactive Card）。
+    若未配置 webhook_url 则静默跳过；发生网络异常仅打印提示，绝不阻塞主构建流程。
+    """
+    if not webhook_url or not webhook_url.strip():
+        return
+
+    elements = [
+        {
+            "tag": "div",
+            "text": {
+                "tag": "lark_md",
+                "content": summary_markdown
+            }
+        }
+    ]
+
+    if button_text and button_url:
+        elements.append({
+            "tag": "action",
+            "actions": [
+                {
+                    "tag": "button",
+                    "text": {
+                        "tag": "plain_text",
+                        "content": button_text
+                    },
+                    "type": "primary",
+                    "url": button_url
+                }
+            ]
+        })
+
+    payload = {
+        "msg_type": "interactive",
+        "card": {
+            "config": {
+                "wide_screen_mode": True
+            },
+            "header": {
+                "title": {
+                    "tag": "plain_text",
+                    "content": title
+                },
+                "template": color
+            },
+            "elements": elements
+        }
+    }
+
+    try:
+        res = requests.post(webhook_url.strip(), json=payload, timeout=8)
+        if res.status_code == 200:
+            print("📲 飞书群通知卡片发送成功！")
+        else:
+            print(f"⚠️ 飞书通知发送返回非200: {res.status_code} {res.text}")
+    except Exception as e:
+        print(f"⚠️ 发送飞书通知网络异常（不影响主流程）: {e}")
+
 def get_file_range_context(file_path, min_line, max_line, radius=15):
     """根据文件中所有缺陷的行号范围，读取连贯的代码上下文（文件<=150行时直接提供全文）"""
     if not os.path.exists(file_path):
@@ -254,7 +314,31 @@ def create_review_issue(repo, headers, batch_issues, batch_title, batch_idx, tot
     }
     res = requests.post(f"https://api.github.com/repos/{repo}/issues", json=issue_payload, headers=headers)
     if res.status_code == 201:
-        print(f"📌 已创建待审核 Issue: {res.json().get('html_url')}")
+        issue_url = res.json().get("html_url")
+        print(f"📌 已创建待审核 Issue: {issue_url}")
+
+        feishu_url = os.environ.get("FEISHU_WEBHOOK_URL")
+        authors_str = " ".join(sorted(issue_authors)) if issue_authors else "暂无"
+        display_issues = [f"• [{iss.get('severity')}] `{iss.get('file_path')}`: {iss.get('issue_desc')}" for iss in batch_issues[:6]]
+        more_note = f"\n*...等共 {len(batch_issues)} 项待决策*" if len(batch_issues) > 6 else ""
+        issue_list_str = "\n".join(display_issues) + more_note
+
+        summary_md = (
+            f"**📦 仓库：** `{repo}`\n"
+            f"**⚠️ 待审核项：** 本批共 **{len(batch_issues)}** 项代码缺陷涉及业务逻辑，需人工确认\n"
+            f"**📢 涉及提交人：** {authors_str}\n\n"
+            f"---\n"
+            f"**🔍 待审清单节选：**\n{issue_list_str}\n\n"
+            f"> 💡 *前往 Issue 评论「同意修复」或「执行全部」即可自动触发二次修复*"
+        )
+        send_feishu_card(
+            webhook_url=feishu_url,
+            title=f"⚠️ [Sonar 待决策] {len(batch_issues)} 项业务代码缺陷需人工审核",
+            summary_markdown=summary_md,
+            button_text="👉 点击前往 Issue 查阅并决策",
+            button_url=issue_url,
+            color="orange"
+        )
     else:
         print(f"❌ 创建 Issue 失败: {res.status_code} {res.text}")
 
@@ -430,7 +514,31 @@ def main():
             }
             pr_res = requests.post(f"https://api.github.com/repos/{repo}/pulls", json=pr_payload, headers=headers)
             if pr_res.status_code == 201:
-                print(f"🎉 成功创建自动修复 PR: {pr_res.json().get('html_url')}")
+                pr_url = pr_res.json().get("html_url")
+                print(f"🎉 成功创建自动修复 PR: {pr_url}")
+
+                feishu_url = os.environ.get("FEISHU_WEBHOOK_URL")
+                authors_str = " ".join(sorted(pr_authors)) if pr_authors else "暂无"
+                display_fixes = fix_descs[:8]
+                more_note = f"\n*...等共 {len(fix_descs)} 项修复*" if len(fix_descs) > 8 else ""
+                fix_list_str = "\n".join(display_fixes) + more_note
+
+                summary_md = (
+                    f"**📦 仓库：** `{repo}`\n"
+                    f"**🌿 目标分支：** `htz`\n"
+                    f"**🛠️ 消除缺陷：** 本次自动批量消除 **{len(fix_descs)}** 项核心代码缺陷\n"
+                    f"**📢 涉及提交人：** {authors_str}\n\n"
+                    f"---\n"
+                    f"**📋 修复清单节选：**\n{fix_list_str}"
+                )
+                send_feishu_card(
+                    webhook_url=feishu_url,
+                    title=f"🤖 [Sonar+AI] 自动批量修复 PR 已发起（{len(fix_descs)} 项）",
+                    summary_markdown=summary_md,
+                    button_text="👉 点击前往 GitHub Review 并合并 PR",
+                    button_url=pr_url,
+                    color="green"
+                )
             else:
                 print(f"❌ 创建 PR 失败: {pr_res.status_code} {pr_res.text}")
         else:

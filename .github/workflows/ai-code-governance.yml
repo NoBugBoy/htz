@@ -64,5 +64,6 @@ jobs:
           AI_API_KEY: ${{ secrets.AI_API_KEY }}
           AI_BASE_URL: ${{ secrets.AI_BASE_URL || 'https://api.deepseek.com/v1' }}
           AI_MODEL: ${{ secrets.AI_MODEL || 'deepseek-v4-flash' }}
+          FEISHU_WEBHOOK_URL: ${{ secrets.FEISHU_WEBHOOK_URL }}
         run: |
           python .github/scripts/triage_sonar_with_ai.py

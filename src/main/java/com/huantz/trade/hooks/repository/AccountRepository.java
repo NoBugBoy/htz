@@ -1,7 +1,7 @@
-package com.huantz.trade.account.repository;
+package com.huantz.trade.hooks.repository;
 
-import com.huantz.trade.account.model.entity.AccountEntity;
 import com.huantz.trade.common.BaseRepository;
+import com.huantz.trade.hooks.model.entity.AccountEntity;
 import org.springframework.stereotype.Repository;
 
 @Repository
