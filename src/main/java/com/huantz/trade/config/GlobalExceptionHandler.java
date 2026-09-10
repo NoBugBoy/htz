@@ -83,7 +83,7 @@ public class GlobalExceptionHandler {
         ProblemDetail.forStatusAndDetail(HttpStatus.INTERNAL_SERVER_ERROR, "系统繁忙，请稍后再试");
     problem.setTitle("系统内部错误");
     problem.setProperty("code", "INTERNAL_SERVER_ERROR");
-    problem.setProperty("timestamp", Instant.now());
+    problem.setProperty(TIMESTAMP, Instant.now());
     return problem;
   }
 }
