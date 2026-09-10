@@ -53,9 +53,23 @@ jobs:
       - name: Install Dependencies
         run: "pip install --only-binary :all: requests==2.32.3 httpx==0.27.2 openai==1.55.0"
 
-      # 1. 执行单元测试并生成 JaCoCo 覆盖率报告
+      # 1. 执行单元测试并生成 JaCoCo 覆盖率报告（JaCoCo 0.8.12 不兼容 Java 25，单测用 Java 21 运行）
+      - name: Set up Java 21 for Tests
+        uses: actions/setup-java@v5
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
       - name: Run Unit Tests & Generate Coverage
         run: mvn -B test
+
+      # 恢复 Java 25 给后续 Sonar 分析使用
+      - name: Set up Java 25 for Sonar
+        uses: actions/setup-java@v5
+        with:
+          java-version: '25'
+          distribution: 'temurin'
+          cache: maven
 
       # 2. 编译并推送分析到 SonarCloud（核心步骤）
       - name: Build and analyze with SonarCloud
