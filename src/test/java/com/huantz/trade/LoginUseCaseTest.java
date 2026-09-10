@@ -110,8 +110,8 @@ class LoginUseCaseTest {
     when(wxMaUserService.getSessionInfo("bad_code"))
         .thenThrow(new WxErrorException(new WxError(40029, "invalid code")));
 
-    var badCommand = new LoginCommand("bad_code");
-    assertThatThrownBy(() -> loginUseCase.execute(badCommand))
+    var command = new LoginCommand("bad_code");
+    assertThatThrownBy(() -> loginUseCase.execute(command))
         .isInstanceOf(BusinessException.class)
         .hasMessageContaining("凭证已失效");
 
