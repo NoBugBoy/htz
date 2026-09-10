@@ -408,7 +408,7 @@ def main():
 }
 
 【常见自动修复标准（一律放入 auto_fix_list）】：
-- GitHub Actions 工作流安全缺陷（如 S8541、S8544）：`pip install` 缺少 `--only-binary :all:` 或未锁定依赖版本，修改为锁定具体版本并添加 `--only-binary :all:`（如 `pip install --only-binary :all: requests==2.32.3 openai==1.55.0`）！
+- GitHub Actions 工作流安全缺陷（如 S8541、S8544）：`pip install` 缺少 `--only-binary :all:` 或未锁定依赖版本，修改为锁定具体版本并添加 `--only-binary :all:`，注意在 YAML 中必须加上双引号（如 `"pip install --only-binary :all: requests==2.32.3 openai==1.55.0"`）以防止冒号引发 YAML 语法错误！
 - 枚举命名规范（S115）：枚举常量名不能以下划线开头，规范重命名（如 `_163` 改为 `MAIL_163`）！
 - 重复字符串字面量（S1192）：复用已定义的常量（如复用 `TIMESTAMP` 代替硬编码 `"timestamp"`）！
 - 同一行声明多个变量（S1659）：拆分为独立行分别声明（如 `String openid, unionId;` 拆为两行声明）！
