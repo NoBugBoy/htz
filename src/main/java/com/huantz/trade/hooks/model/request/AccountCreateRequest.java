@@ -1,4 +1,4 @@
-package com.huantz.trade.account.model.request;
+package com.huantz.trade.hooks.model.request;
 
 import com.huantz.trade.enums.EmailTypeEnum;
 import com.huantz.trade.enums.GenderEnum;

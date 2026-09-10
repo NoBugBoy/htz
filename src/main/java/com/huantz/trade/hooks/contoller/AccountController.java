@@ -1,7 +1,7 @@
-package com.huantz.trade.account.contoller;
+package com.huantz.trade.hooks.contoller;
 
-import com.huantz.trade.account.model.request.AccountCreateRequest;
-import com.huantz.trade.account.service.AccountCommandService;
+import com.huantz.trade.hooks.model.request.AccountCreateRequest;
+import com.huantz.trade.hooks.service.AccountCommandService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;

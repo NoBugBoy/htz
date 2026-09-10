@@ -1,4 +1,4 @@
-package com.huantz.trade.account.model.entity;
+package com.huantz.trade.hooks.model.entity;
 
 import com.huantz.trade.common.BaseEntity;
 import com.huantz.trade.enums.AccountStatusEnum;

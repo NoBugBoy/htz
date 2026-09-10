@@ -13,6 +13,37 @@ def run_cmd(cmd, check=False):
             raise RuntimeError(msg)
     return res.stdout.strip()
 
+def send_feishu_card(webhook_url, title, summary_markdown, button_text=None, button_url=None, color="green"):
+    """向飞书群机器人发送富文本互动卡片（未配置静默跳过，异常不阻塞主流程）"""
+    if not webhook_url or not webhook_url.strip():
+        return
+    elements = [
+        {"tag": "div", "text": {"tag": "lark_md", "content": summary_markdown}}
+    ]
+    if button_text and button_url:
+        elements.append({
+            "tag": "action",
+            "actions": [
+                {"tag": "button", "text": {"tag": "plain_text", "content": button_text}, "type": "primary", "url": button_url}
+            ]
+        })
+    payload = {
+        "msg_type": "interactive",
+        "card": {
+            "config": {"wide_screen_mode": True},
+            "header": {"title": {"tag": "plain_text", "content": title}, "template": color},
+            "elements": elements
+        }
+    }
+    try:
+        res = requests.post(webhook_url.strip(), json=payload, timeout=8)
+        if res.status_code == 200:
+            print("📲 飞书群通知卡片发送成功！")
+        else:
+            print(f"⚠️ 飞书通知发送返回非200: {res.status_code} {res.text}")
+    except Exception as e:
+        print(f"⚠️ 发送飞书通知网络异常（不影响主流程）: {e}")
+
 def get_code_context(file_path, target_line, radius=20):
     if not os.path.exists(file_path):
         return ""
@@ -348,6 +379,25 @@ def main():
         )
         post_issue_comment(repo, headers, issue_number, reply)
         print("✅ 已回复 Issue")
+
+        # 飞书群通知
+        feishu_url = os.environ.get("FEISHU_WEBHOOK_URL")
+        feishu_md = (
+            f"**📦 仓库：** `{repo}`\n"
+            f"**📌 关联 Issue：** #{issue_number}\n"
+            f"**💬 开发者指令：** `{comment_body.strip()}`\n"
+            f"**🛠️ 修复结果：** 本次成功修复 **{len(fix_descs)}** 项缺陷并提 PR\n\n"
+            f"---\n"
+            f"**📋 修复清单：**\n{fix_detail}"
+        )
+        send_feishu_card(
+            webhook_url=feishu_url,
+            title=f"✅ [AI Fix] Issue #{issue_number} 决策修复 PR 已创建",
+            summary_markdown=feishu_md,
+            button_text="👉 点击前往 GitHub Review 并合并 PR",
+            button_url=pr_url,
+            color="green"
+        )
 
     except Exception as e:
         # 任何步骤失败，统一回写 Issue，方便开发者排查

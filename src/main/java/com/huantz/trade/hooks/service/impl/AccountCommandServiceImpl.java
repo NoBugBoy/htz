@@ -1,12 +1,12 @@
-package com.huantz.trade.account.service.impl;
+package com.huantz.trade.hooks.service.impl;
 
-import com.huantz.trade.account.mapper.AccountMapper;
-import com.huantz.trade.account.model.entity.AccountEntity;
-import com.huantz.trade.account.model.request.AccountCreateRequest;
-import com.huantz.trade.account.repository.AccountRepository;
-import com.huantz.trade.account.service.AccountCommandService;
 import com.huantz.trade.enums.AccountStatusEnum;
 import com.huantz.trade.exception.BusinessException;
+import com.huantz.trade.hooks.mapper.AccountMapper;
+import com.huantz.trade.hooks.model.entity.AccountEntity;
+import com.huantz.trade.hooks.model.request.AccountCreateRequest;
+import com.huantz.trade.hooks.repository.AccountRepository;
+import com.huantz.trade.hooks.service.AccountCommandService;
 import com.huantz.trade.lookup.GameServerService;
 import com.huantz.trade.lookup.SectService;
 import lombok.RequiredArgsConstructor;
