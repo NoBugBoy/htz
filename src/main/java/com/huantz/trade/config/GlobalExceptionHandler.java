@@ -51,9 +51,8 @@ public class GlobalExceptionHandler {
         ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "请求参数校验失败，请检查输入");
     problem.setTitle("参数不合法");
     problem.setProperty("code", "PARAM_INVALID");
-    problem.setProperty("timestamp", Instant.now());
+    problem.setProperty(TIMESTAMP, Instant.now());
 
-    // 提取所有字段的校验错误信息: { "phone": "手机号格式不正确", "age": "年龄必须大于18" }
     Map<String, String> invalidParams =
         ex.getBindingResult().getFieldErrors().stream()
             .collect(
