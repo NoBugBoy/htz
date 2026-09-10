@@ -1,101 +1,101 @@
 package com.huantz.trade.common;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
+
+import java.time.LocalDateTime;
+import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.core.context.SecurityContextHolder;
 
-import java.time.LocalDateTime;
-import java.util.List;
-
-import static org.assertj.core.api.Assertions.assertThat;
-
 class CustomAuditListenerTest {
 
-    private final CustomAuditListener listener = new CustomAuditListener();
+  private final CustomAuditListener listener = new CustomAuditListener();
 
-    static class DummyEntity extends BaseEntity {
-        private Long id;
-        @Override
-        public Long getId() {
-            return id;
-        }
-        @Override
-        public void setId(Long id) {
-            this.id = id;
-        }
+  static class DummyEntity extends BaseEntity {
+    private Long id;
+
+    @Override
+    public Long getId() {
+      return id;
     }
 
-    @AfterEach
-    void tearDown() {
-        SecurityContextHolder.clearContext();
+    @Override
+    public void setId(Long id) {
+      this.id = id;
     }
+  }
 
-    @Test
-    @DisplayName("touchForCreate - 带有登录上下文")
-    void touchForCreateWithAuth() {
-        LoginUserAuthentication auth = new LoginUserAuthentication(100L, List.of("ADMIN"));
-        SecurityContextHolder.getContext().setAuthentication(auth);
+  @AfterEach
+  void tearDown() {
+    SecurityContextHolder.clearContext();
+  }
 
-        DummyEntity entity = new DummyEntity();
-        listener.touchForCreate(entity);
+  @Test
+  @DisplayName("touchForCreate - 带有登录上下文")
+  void touchForCreateWithAuth() {
+    LoginUserAuthentication auth = new LoginUserAuthentication(100L, List.of("ADMIN"));
+    SecurityContextHolder.getContext().setAuthentication(auth);
 
-        assertThat(entity.getCreateTime()).isNotNull();
-        assertThat(entity.getUpdateTime()).isNotNull();
-        assertThat(entity.getCreateBy()).isEqualTo(100L);
-        assertThat(entity.getUpdateBy()).isEqualTo(100L);
-    }
+    DummyEntity entity = new DummyEntity();
+    listener.touchForCreate(entity);
 
-    @Test
-    @DisplayName("touchForCreate - 无登录上下文")
-    void touchForCreateWithoutAuth() {
-        DummyEntity entity = new DummyEntity();
-        listener.touchForCreate(entity);
+    assertThat(entity.getCreateTime()).isNotNull();
+    assertThat(entity.getUpdateTime()).isNotNull();
+    assertThat(entity.getCreateBy()).isEqualTo(100L);
+    assertThat(entity.getUpdateBy()).isEqualTo(100L);
+  }
 
-        assertThat(entity.getCreateTime()).isNotNull();
-        assertThat(entity.getUpdateTime()).isNotNull();
-        assertThat(entity.getCreateBy()).isNull();
-        assertThat(entity.getUpdateBy()).isNull();
-    }
+  @Test
+  @DisplayName("touchForCreate - 无登录上下文")
+  void touchForCreateWithoutAuth() {
+    DummyEntity entity = new DummyEntity();
+    listener.touchForCreate(entity);
 
-    @Test
-    @DisplayName("touchForCreate - 非 BaseEntity 对象")
-    void touchForCreateNonBaseEntity() {
-        listener.touchForCreate(new Object());
-        assertThat(true).isTrue();
-    }
+    assertThat(entity.getCreateTime()).isNotNull();
+    assertThat(entity.getUpdateTime()).isNotNull();
+    assertThat(entity.getCreateBy()).isNull();
+    assertThat(entity.getUpdateBy()).isNull();
+  }
 
-    @Test
-    @DisplayName("touchForUpdate - 带有登录上下文")
-    void touchForUpdateWithAuth() {
-        LoginUserAuthentication auth = new LoginUserAuthentication(200L, List.of("ADMIN"));
-        SecurityContextHolder.getContext().setAuthentication(auth);
+  @Test
+  @DisplayName("touchForCreate - 非 BaseEntity 对象")
+  void touchForCreateNonBaseEntity() {
+    assertThatCode(() -> listener.touchForCreate(new Object())).doesNotThrowAnyException();
+  }
 
-        DummyEntity entity = new DummyEntity();
-        LocalDateTime oldTime = LocalDateTime.now().minusDays(1);
-        entity.setCreateTime(oldTime);
-        entity.setUpdateTime(oldTime);
+  @Test
+  @DisplayName("touchForUpdate - 带有登录上下文")
+  void touchForUpdateWithAuth() {
+    LoginUserAuthentication auth = new LoginUserAuthentication(200L, List.of("ADMIN"));
+    SecurityContextHolder.getContext().setAuthentication(auth);
 
-        listener.touchForUpdate(entity);
+    DummyEntity entity = new DummyEntity();
+    LocalDateTime oldTime = LocalDateTime.now().minusDays(1);
+    entity.setCreateTime(oldTime);
+    entity.setUpdateTime(oldTime);
 
-        assertThat(entity.getUpdateTime()).isAfter(oldTime);
-        assertThat(entity.getUpdateBy()).isEqualTo(200L);
-    }
+    listener.touchForUpdate(entity);
 
-    @Test
-    @DisplayName("touchForUpdate - 无登录上下文")
-    void touchForUpdateWithoutAuth() {
-        DummyEntity entity = new DummyEntity();
-        listener.touchForUpdate(entity);
+    assertThat(entity.getUpdateTime()).isAfter(oldTime);
+    assertThat(entity.getUpdateBy()).isEqualTo(200L);
+  }
 
-        assertThat(entity.getUpdateTime()).isNotNull();
-        assertThat(entity.getUpdateBy()).isNull();
-    }
+  @Test
+  @DisplayName("touchForUpdate - 无登录上下文")
+  void touchForUpdateWithoutAuth() {
+    DummyEntity entity = new DummyEntity();
+    listener.touchForUpdate(entity);
 
-    @Test
-    @DisplayName("touchForUpdate - 非 BaseEntity 对象")
-    void touchForUpdateNonBaseEntity() {
-        listener.touchForUpdate(new Object());
-        assertThat(true).isTrue();
-    }
+    assertThat(entity.getUpdateTime()).isNotNull();
+    assertThat(entity.getUpdateBy()).isNull();
+  }
+
+  @Test
+  @DisplayName("touchForUpdate - 非 BaseEntity 对象")
+  void touchForUpdateNonBaseEntity() {
+    assertThatCode(() -> listener.touchForUpdate(new Object())).doesNotThrowAnyException();
+  }
 }
