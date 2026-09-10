@@ -1,7 +1,10 @@
 package com.huantz.trade.user.service.impl;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.*;
+
 import com.huantz.trade.common.LoginUserAuthentication;
-import com.huantz.trade.common.SecurityHolder;
 import com.huantz.trade.common.cache.CacheHelper;
 import com.huantz.trade.exception.BusinessException;
 import com.huantz.trade.user.cache.AccountCacheKey;
@@ -9,6 +12,8 @@ import com.huantz.trade.user.mapper.admin.AdminEntityMapper;
 import com.huantz.trade.user.model.dto.AdminRestPasswordDto;
 import com.huantz.trade.user.model.entity.AdminEntity;
 import com.huantz.trade.user.repository.AdminRepository;
+import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -19,118 +24,109 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
-import java.util.Optional;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.Mockito.*;
-
 @ExtendWith(MockitoExtension.class)
 class AdminCommandServiceImplTest {
 
-    @Mock
-    private AdminEntityMapper adminEntityMapper;
+  @Mock private AdminEntityMapper adminEntityMapper;
 
-    @Mock
-    private AdminRepository adminRepository;
+  @Mock private AdminRepository adminRepository;
 
-    @Mock
-    private PasswordEncoder passwordEncoder;
+  @Mock private PasswordEncoder passwordEncoder;
 
-    @Mock
-    private CacheHelper cacheHelper;
+  @Mock private CacheHelper cacheHelper;
 
-    @InjectMocks
-    private AdminCommandServiceImpl service;
+  @InjectMocks private AdminCommandServiceImpl service;
 
-    @AfterEach
-    void tearDown() {
-        SecurityContextHolder.clearContext();
-    }
+  @AfterEach
+  void tearDown() {
+    SecurityContextHolder.clearContext();
+  }
 
-    @Test
-    @DisplayName("保存管理员")
-    void saveAdminUser() {
-        AdminEntity entity = new AdminEntity();
-        entity.setId(1L);
-        when(adminEntityMapper.toAdminEntity("test@test.com", "pwd", true)).thenReturn(entity);
-        when(adminRepository.save(entity)).thenReturn(entity);
+  @Test
+  @DisplayName("保存管理员")
+  void saveAdminUser() {
+    AdminEntity entity = new AdminEntity();
+    entity.setId(1L);
+    when(adminEntityMapper.toAdminEntity("test@test.com", "pwd", true)).thenReturn(entity);
+    when(adminRepository.save(entity)).thenReturn(entity);
 
-        Long id = service.saveAdminUser("test@test.com", "pwd");
+    Long id = service.saveAdminUser("test@test.com", "pwd");
 
-        assertThat(id).isEqualTo(1L);
-    }
+    assertThat(id).isEqualTo(1L);
+  }
 
-    @Test
-    @DisplayName("重置密码 (用户内) - 密码错误")
-    void resetPasswordInternalWrongPwd() {
-        SecurityContextHolder.getContext().setAuthentication(new LoginUserAuthentication(1L, "user"));
-        AdminEntity entity = new AdminEntity();
-        entity.setPassword("encoded");
-        
-        when(adminRepository.findById(1L)).thenReturn(Optional.of(entity));
-        when(passwordEncoder.matches("wrong", "encoded")).thenReturn(false);
+  @Test
+  @DisplayName("重置密码 (用户内) - 密码错误")
+  void resetPasswordInternalWrongPwd() {
+    SecurityContextHolder.getContext()
+        .setAuthentication(new LoginUserAuthentication(1L, List.of("user")));
+    AdminEntity entity = new AdminEntity();
+    entity.setPassword("encoded");
 
-        assertThatThrownBy(() -> service.resetPassword("wrong", "newpwd"))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("旧密码错误");
-    }
+    when(adminRepository.findById(1L)).thenReturn(Optional.of(entity));
+    when(passwordEncoder.matches("wrong", "encoded")).thenReturn(false);
 
-    @Test
-    @DisplayName("重置密码 (用户内) - 成功")
-    void resetPasswordInternalSuccess() {
-        SecurityContextHolder.getContext().setAuthentication(new LoginUserAuthentication(1L, "user"));
-        AdminEntity entity = new AdminEntity();
-        entity.setPassword("encoded");
-        
-        when(adminRepository.findById(1L)).thenReturn(Optional.of(entity));
-        when(passwordEncoder.matches("old", "encoded")).thenReturn(true);
-        when(passwordEncoder.encode("new")).thenReturn("encodedNew");
+    assertThatThrownBy(() -> service.resetPassword("wrong", "newpwd"))
+        .isInstanceOf(BusinessException.class)
+        .hasMessageContaining("旧密码错误");
+  }
 
-        service.resetPassword("old", "new");
+  @Test
+  @DisplayName("重置密码 (用户内) - 成功")
+  void resetPasswordInternalSuccess() {
+    SecurityContextHolder.getContext()
+        .setAuthentication(new LoginUserAuthentication(1L, List.of("user")));
+    AdminEntity entity = new AdminEntity();
+    entity.setPassword("encoded");
 
-        assertThat(entity.getPassword()).isEqualTo("encodedNew");
-        verify(adminRepository).saveAndFlush(entity);
-    }
+    when(adminRepository.findById(1L)).thenReturn(Optional.of(entity));
+    when(passwordEncoder.matches("old", "encoded")).thenReturn(true);
+    when(passwordEncoder.encode("new")).thenReturn("encodedNew");
 
-    @Test
-    @DisplayName("重置密码 (OTT) - 链接无效")
-    void resetPasswordOttInvalid() {
-        when(cacheHelper.getAndEvict(AccountCacheKey.OTT_RESET_PASSWORD, "invalid"))
-                .thenReturn(Optional.empty());
+    service.resetPassword("old", "new");
 
-        assertThatThrownBy(() -> service.resetPassword("invalid"))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("链接不存在或已失效");
-    }
+    assertThat(entity.getPassword()).isEqualTo("encodedNew");
+    verify(adminRepository).saveAndFlush(entity);
+  }
 
-    @Test
-    @DisplayName("重置密码 (OTT) - 用户不存在")
-    void resetPasswordOttUserNotFound() {
-        AdminRestPasswordDto dto = new AdminRestPasswordDto("test@test.com", "new");
-        when(cacheHelper.getAndEvict(AccountCacheKey.OTT_RESET_PASSWORD, "valid"))
-                .thenReturn(Optional.of(dto));
-        when(adminRepository.findByEmail("test@test.com")).thenReturn(Optional.empty());
+  @Test
+  @DisplayName("重置密码 (OTT) - 链接无效")
+  void resetPasswordOttInvalid() {
+    when(cacheHelper.getAndEvict(AccountCacheKey.OTT_RESET_PASSWORD, "invalid"))
+        .thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.resetPassword("valid"))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("账号不存在");
-    }
+    assertThatThrownBy(() -> service.resetPassword("invalid"))
+        .isInstanceOf(BusinessException.class)
+        .hasMessageContaining("链接不存在或已失效");
+  }
 
-    @Test
-    @DisplayName("重置密码 (OTT) - 成功")
-    void resetPasswordOttSuccess() {
-        AdminRestPasswordDto dto = new AdminRestPasswordDto("test@test.com", "new");
-        when(cacheHelper.getAndEvict(AccountCacheKey.OTT_RESET_PASSWORD, "valid"))
-                .thenReturn(Optional.of(dto));
-        
-        AdminEntity entity = new AdminEntity();
-        when(adminRepository.findByEmail("test@test.com")).thenReturn(Optional.of(entity));
-        when(passwordEncoder.encode("new")).thenReturn("encodedNew");
+  @Test
+  @DisplayName("重置密码 (OTT) - 用户不存在")
+  void resetPasswordOttUserNotFound() {
+    AdminRestPasswordDto dto = new AdminRestPasswordDto("test@test.com", "new");
+    when(cacheHelper.getAndEvict(AccountCacheKey.OTT_RESET_PASSWORD, "valid"))
+        .thenReturn(Optional.of(dto));
+    when(adminRepository.findByEmail("test@test.com")).thenReturn(Optional.empty());
 
-        service.resetPassword("valid");
+    assertThatThrownBy(() -> service.resetPassword("valid"))
+        .isInstanceOf(BusinessException.class)
+        .hasMessageContaining("账号不存在");
+  }
 
-        assertThat(entity.getPassword()).isEqualTo("encodedNew");
-        verify(adminRepository).saveAndFlush(entity);
-    }
+  @Test
+  @DisplayName("重置密码 (OTT) - 成功")
+  void resetPasswordOttSuccess() {
+    AdminRestPasswordDto dto = new AdminRestPasswordDto("test@test.com", "new");
+    when(cacheHelper.getAndEvict(AccountCacheKey.OTT_RESET_PASSWORD, "valid"))
+        .thenReturn(Optional.of(dto));
+
+    AdminEntity entity = new AdminEntity();
+    when(adminRepository.findByEmail("test@test.com")).thenReturn(Optional.of(entity));
+    when(passwordEncoder.encode("new")).thenReturn("encodedNew");
+
+    service.resetPassword("valid");
+
+    assertThat(entity.getPassword()).isEqualTo("encodedNew");
+    verify(adminRepository).saveAndFlush(entity);
+  }
 }

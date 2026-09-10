@@ -45,8 +45,8 @@ class AccountCommandServiceImplTest {
     @Test
     @DisplayName("创建账号 - 服务器不存在")
     void createServerNotFound() {
-        AccountCreateRequest request = new AccountCreateRequest();
-        request.setServerId(1L);
+        AccountCreateRequest request = mock(AccountCreateRequest.class);
+        when(request.serverId()).thenReturn(1L);
         AccountEntity entity = new AccountEntity();
         
         when(accountMapper.toEntity(request)).thenReturn(entity);
@@ -60,9 +60,9 @@ class AccountCommandServiceImplTest {
     @Test
     @DisplayName("创建账号 - 门派不存在")
     void createSectNotFound() {
-        AccountCreateRequest request = new AccountCreateRequest();
-        request.setServerId(1L);
-        request.setSectId(2L);
+        AccountCreateRequest request = mock(AccountCreateRequest.class);
+        when(request.serverId()).thenReturn(1L);
+        when(request.sectId()).thenReturn(2L);
         AccountEntity entity = new AccountEntity();
         
         when(accountMapper.toEntity(request)).thenReturn(entity);
@@ -77,9 +77,9 @@ class AccountCommandServiceImplTest {
     @Test
     @DisplayName("创建账号 - 成功")
     void createSuccess() {
-        AccountCreateRequest request = new AccountCreateRequest();
-        request.setServerId(1L);
-        request.setSectId(2L);
+        AccountCreateRequest request = mock(AccountCreateRequest.class);
+        when(request.serverId()).thenReturn(1L);
+        when(request.sectId()).thenReturn(2L);
         
         AccountEntity entity = new AccountEntity();
         entity.setPrice(new BigDecimal("100.00"));

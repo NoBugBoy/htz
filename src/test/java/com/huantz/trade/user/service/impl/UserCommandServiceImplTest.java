@@ -47,7 +47,8 @@ class UserCommandServiceImplTest {
     @Test
     @DisplayName("用户注册")
     void register() {
-        UserCommandServiceImpl.UserRegister register = new UserCommandServiceImpl.UserRegister("openid", "unionid", new Phone("123456", "13800138000"), new Email("test@test.com"));
+        UserCommandServiceImpl.UserRegister register = new UserCommandServiceImpl.UserRegister(
+                "openid", "unionid", new Phone("13800138000"), new Email("test@test.com", "1234", false));
         UserEntity entity = new UserEntity();
         
         when(userEntityMapper.toUserEntity(register)).thenReturn(entity);
@@ -62,7 +63,7 @@ class UserCommandServiceImplTest {
     @Test
     @DisplayName("更新资料 - 用户不存在")
     void updateProfileUserNotFound() {
-        LoginUserAuthentication auth = new LoginUserAuthentication(1L, "user");
+        LoginUserAuthentication auth = new LoginUserAuthentication(1L, java.util.List.of("user"));
         SecurityContextHolder.getContext().setAuthentication(auth);
         
         when(userQueryService.getUserByUserId(1L)).thenReturn(Optional.empty());
@@ -75,7 +76,7 @@ class UserCommandServiceImplTest {
     @Test
     @DisplayName("更新资料 - 成功")
     void updateProfileSuccess() {
-        LoginUserAuthentication auth = new LoginUserAuthentication(1L, "user");
+        LoginUserAuthentication auth = new LoginUserAuthentication(1L, java.util.List.of("user"));
         SecurityContextHolder.getContext().setAuthentication(auth);
         
         UserEntity entity = new UserEntity();
