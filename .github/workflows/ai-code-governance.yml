@@ -37,7 +37,7 @@ jobs:
           fetch-depth: 0 # Sonar 需要完整的 Git 历史来比对责任人和代码变更
 
       - name: Set up Java
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           java-version: '25'
           distribution: 'temurin'
@@ -69,7 +69,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_PROJECT_KEY: NoBugBoy_htz
-          GITHUB_REF_NAME: ${{ github.ref_name }}
+          SONAR_BRANCH: main
           AI_API_KEY: ${{ secrets.AI_API_KEY }}
           AI_BASE_URL: ${{ secrets.AI_BASE_URL || 'https://api.deepseek.com/v1' }}
           AI_MODEL: ${{ secrets.AI_MODEL || 'deepseek-v4-flash' }}

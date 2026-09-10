@@ -207,18 +207,10 @@ def fetch_all_sonar_issues(sonar_token, project_key, branch=None):
 
         res = requests.get(url, auth=(sonar_token, ""))
         if res.status_code != 200:
-            # 若带 impactSeverities 报错（例如旧版接口），尝试关闭该参数降级拉取并在内存过滤
             if use_impact_param:
                 print(f"⚠️ impactSeverities 参数不受支持，降级为全量拉取后本地过滤...")
                 use_impact_param = False
                 continue
-
-            # 若指定 branch 失败，自动降级为默认/主分支检索
-            if branch:
-                print(f"⚠️ 携带 branch={branch} 请求失败 (状态码 {res.status_code})，尝试不带 branch 请求...")
-                branch = None
-                continue
-
             print(f"❌ SonarCloud API 请求失败 (第{page}页): {res.text}")
             break
 
@@ -381,7 +373,7 @@ def create_review_issue(repo, headers, batch_issues, batch_title, batch_idx, tot
 def main():
     sonar_token = os.environ.get("SONAR_TOKEN")
     project_key = os.environ.get("SONAR_PROJECT_KEY", "NoBugBoy_htz")
-    branch      = os.environ.get("GITHUB_REF_NAME") or os.environ.get("BRANCH_NAME")
+    branch      = os.environ.get("SONAR_BRANCH") or os.environ.get("GITHUB_REF_NAME") or "main"
     repo        = os.environ["GITHUB_REPOSITORY"]
     gh_token    = os.environ["GITHUB_TOKEN"]
     headers     = {"Authorization": f"Bearer {gh_token}", "Accept": "application/vnd.github.v3+json"}
