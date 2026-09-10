@@ -90,7 +90,8 @@ class GameServerServiceImplTest {
   void updateNotFound() {
     when(repository.findById(1L)).thenReturn(Optional.empty());
 
-    assertThatThrownBy(() -> service.update(1L, new GameServerRequest("Server 2")))
+    GameServerRequest request = new GameServerRequest("Server 2");
+    assertThatThrownBy(() -> service.update(1L, request))
         .isInstanceOf(BusinessException.class)
         .hasMessageContaining("该数据已经被删除");
   }
