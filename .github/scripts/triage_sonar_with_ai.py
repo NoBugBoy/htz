@@ -71,58 +71,59 @@ def send_feishu_card(webhook_url, title, summary_markdown, button_text=None, but
         print(f"⚠️ 发送飞书通知网络异常（不影响主流程）: {e}")
 
 def get_file_range_context(file_path, min_line, max_line, radius=15):
-    """根据文件中所有缺陷的行号范围，读取连贯的代码上下文（文件<=150行时直接提供全文）"""
+    """读取代码上下文，每行前缀真实行号（1-based），AI 通过行号精准定位缺陷位置"""
     if not os.path.exists(file_path):
         return ""
     try:
         with open(file_path, "r", encoding="utf-8") as f:
             lines = f.readlines()
-        if len(lines) <= 150:
-            return "".join(lines)
+        total = len(lines)
+        if total <= 150:
+            # 全文带行号
+            return "".join(f"{i+1:4d}: {l}" for i, l in enumerate(lines))
         start = max(0, min_line - radius - 1)
-        end   = min(len(lines), max_line + radius)
-        return "".join(lines[start:end])
+        end   = min(total, max_line + radius)
+        return "".join(f"{i+1:4d}: {lines[i]}" for i in range(start, end))
     except Exception:
         return ""
 
-def apply_single_fix(content, orig, fixed):
-    """智能代码替换，包含精确匹配、标准化换行/首尾空格容错匹配"""
-    if not orig:
-        return content, False
+def apply_line_fix(file_path, start_line, end_line, fixed_lines_text):
+    """
+    基于行号的精准替换：
+    - start_line / end_line：1-based，闭区间，将该区间行替换为 fixed_lines_text。
+    - fixed_lines_text 为空字符串时表示删除该区间（代码删除类修复）。
+    返回 (new_content, success)
+    """
+    if not os.path.exists(file_path):
+        return None, False
+    try:
+        with open(file_path, "r", encoding="utf-8") as f:
+            lines = f.readlines()
+        total = len(lines)
+        # 行号合法性校验
+        if start_line < 1 or end_line < start_line or end_line > total:
+            print(f"  ⚠️ 行号越界 ({start_line}-{end_line}，共 {total} 行)，跳过: {file_path}")
+            return None, False
 
-    # 1. 尝试直接精确匹配
-    if orig in content:
-        return content.replace(orig, fixed, 1), True
+        # 推断缩进：取待替换首行的前导空白
+        orig_first = lines[start_line - 1]
+        indent = orig_first[: len(orig_first) - len(orig_first.lstrip())]
 
-    # 2. 统一转换为 \n 换行后匹配
-    orig_norm = orig.replace("\r\n", "\n")
-    content_norm = content.replace("\r\n", "\n")
-    fixed_norm = fixed.replace("\r\n", "\n")
-    if orig_norm in content_norm:
-        return content_norm.replace(orig_norm, fixed_norm, 1), True
+        if fixed_lines_text.strip() == "":
+            # 删除整个区间
+            new_lines = lines[:start_line - 1] + lines[end_line:]
+        else:
+            # 为替换内容按原始缩进对齐
+            replacement = []
+            for ln in fixed_lines_text.splitlines():
+                stripped = ln.lstrip()
+                replacement.append((indent + stripped if stripped else "") + "\n")
+            new_lines = lines[:start_line - 1] + replacement + lines[end_line:]
 
-    # 3. 去除首尾空白行后尝试匹配
-    orig_strip = orig_norm.strip()
-    if orig_strip and orig_strip in content_norm:
-        return content_norm.replace(orig_strip, fixed_norm.strip(), 1), True
-
-    # 4. 如果 orig 只有单行，尝试按行两端 strip 匹配
-    orig_lines = [l.strip() for l in orig_norm.split("\n") if l.strip()]
-    if len(orig_lines) == 1:
-        single_target = orig_lines[0]
-        c_lines = content_norm.split("\n")
-        for idx, line in enumerate(c_lines):
-            if line.strip() == single_target:
-                if fixed_norm.strip():
-                    indent = line[:len(line) - len(line.lstrip())]
-                    replacement_lines = [indent + l.lstrip() if l.strip() else "" for l in fixed_norm.split("\n")]
-                    c_lines[idx:idx+1] = replacement_lines
-                else:
-                    # 删除该行
-                    c_lines.pop(idx)
-                return "\n".join(c_lines), True
-
-    return content, False
+        return "".join(new_lines), True
+    except Exception as e:
+        print(f"  ⚠️ apply_line_fix 异常: {e}")
+        return None, False
 
 def get_blame_author(file_path, line, repo, headers, sha_cache):
     """通过 git blame 找到指定行的提交 SHA 并通过 GitHub API 映射 @login"""
@@ -387,8 +388,9 @@ def main():
       "file_path": "文件路径",
       "severity": "严重级别",
       "issue_desc": "缺陷简要说明",
-      "original_snippet": "待替换/删除的目标代码片段（只包含目标行，严禁包含无关周边行）",
-      "fixed_snippet": "修复后的新代码（如果是删除语句或死代码，直接填空字符串 \"\"）"
+      "start_line": 需要替换的起始行号（整数，1-based，与 code_context 中的行号严格对应）,
+      "end_line": 需要替换的结束行号（整数，1-based，闭区间，单行修复时等于 start_line）,
+      "fixed_lines": "替换后的完整代码（保留缩进格式；若为删除操作则填空字符串 \"\"）"
     }
   ],
   "need_review_list": [
@@ -415,7 +417,7 @@ def main():
 - 未指定时区获取当前时间（S8688）：`LocalDateTime.now()` 显式指定时区为 `LocalDateTime.now(ZoneId.systemDefault())`！
 - 遗留 Date API（S2143）：改用现代 `java.time` API（如 `Instant.now()`、`Duration` 等）！
 - 测试异常断言内部多次方法调用（S5778）：将可能抛异常的方法入参构造移出 lambda 外！
-- 明显的致错空指针（如方法形参被置空 `request = null;`、`user = null;`），直接将该置空语句整行删除（fixed_snippet 传 ""）！
+- 明显的致错空指针（如方法形参被置空 `request = null;`、`user = null;`），直接将该置空语句整行删除（fixed_lines 传 ""）！
 - 无用局部变量与死代码（如 `String rawSql = ...;`、`String hardcodedJwtSecret = ...;` 未使用），直接整行删除！
 - 注释掉的代码块（S125），直接删除！
 - 工具类缺少私有构造函数（S1118），为工具类添加 private 构造方法！
@@ -423,9 +425,11 @@ def main():
 - 未使用方法返回值（如 `orElseGet` 未使用），加上合理赋值或防御检查！
 - 常量判空反转（`"ABC".equals(val)` 代替 `val.equals("ABC")`）。
 
-【至关重要的精准替换规则】：
-- original_snippet 必须是【最小化目标行】（通常仅 1 行），严禁包含未修改的方法声明、括号或周边行！
-- 删除代码时：fixed_snippet 直接填空字符串 ""。
+【行号定位规则（至关重要）】：
+- code_context 每行前缀格式为 "  行号: 代码"，你必须严格使用这个行号填写 start_line / end_line！
+- 单行修复：start_line == end_line，填写该行行号。
+- 多行删除（如注释块）：start_line 到 end_line 覆盖整个区间。
+- fixed_lines 中无需填写行号前缀，只填纯代码内容；删除时填空字符串 ""。
 """
 
     all_auto_fixes  = []
@@ -465,32 +469,38 @@ def main():
         fix_descs  = []
         pr_authors = set()
 
+        # 按文件分组，每个文件内按行号降序排序，从后往前替换以避免行号偏移
+        from collections import defaultdict
+        fixes_by_file = defaultdict(list)
         for fix in all_auto_fixes:
-            fp    = fix["file_path"]
-            orig  = fix["original_snippet"]
-            fixed = fix.get("fixed_snippet", "")
-            sev   = fix.get("severity", "MAJOR")
+            fixes_by_file[fix["file_path"]].append(fix)
 
-            if not os.path.exists(fp):
-                print(f"⚠️ 文件不存在，跳过: {fp}")
-                continue
+        for fp, file_fixes in fixes_by_file.items():
+            # 同文件内从最后一行往前替换，保证前面行号不受影响
+            file_fixes_sorted = sorted(file_fixes, key=lambda x: x.get("start_line", 0), reverse=True)
+            for fix in file_fixes_sorted:
+                start = fix.get("start_line")
+                end   = fix.get("end_line", start)
+                fixed = fix.get("fixed_lines", "")
+                sev   = fix.get("severity", "MAJOR")
 
-            with open(fp, "r", encoding="utf-8") as f:
-                content = f.read()
+                if start is None:
+                    print(f"  ⚠️ 缺少 start_line，跳过: {fp} | {fix.get('issue_desc','')}")
+                    continue
 
-            new_content, success = apply_single_fix(content, orig, fixed)
-            if success:
-                with open(fp, "w", encoding="utf-8") as f:
-                    f.write(new_content)
-                modified = True
-                author = file_author_map.get(fp)
-                author_str = f"（提交人：{author}）" if author else ""
-                fix_descs.append(f"- [{sev}] `{fp}`{author_str}: {fix['issue_desc']}")
-                if author and author != "-":
-                    pr_authors.add(author)
-                print(f"✅ 成功修复: {fp}  {author_str}")
-            else:
-                print(f"⚠️ 未能精确匹配旧代码，跳过: {fp} -> {repr(orig)}")
+                new_content, success = apply_line_fix(fp, start, end, fixed)
+                if success:
+                    with open(fp, "w", encoding="utf-8") as f:
+                        f.write(new_content)
+                    modified = True
+                    author = file_author_map.get(fp)
+                    author_str = f"（提交人：{author}）" if author else ""
+                    fix_descs.append(f"- [{sev}] `{fp}`{author_str}: {fix['issue_desc']}")
+                    if author and author != "-":
+                        pr_authors.add(author)
+                    print(f"  ✅ 成功修复 L{start}-L{end}: {fp}  {author_str}")
+                else:
+                    print(f"  ⚠️ 行号定位失败，跳过: {fp} L{start}-L{end}")
 
         if modified:
             print("🎨 执行 Spotless 格式化...")
