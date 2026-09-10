@@ -1,0 +1,89 @@
+package com.huantz.trade.user.service.impl;
+
+import com.huantz.trade.common.LoginUserAuthentication;
+import com.huantz.trade.common.SecurityHolder;
+import com.huantz.trade.exception.BusinessException;
+import com.huantz.trade.user.UserQueryService;
+import com.huantz.trade.user.mapper.UserEntityMapper;
+import com.huantz.trade.user.model.dto.Email;
+import com.huantz.trade.user.model.dto.Phone;
+import com.huantz.trade.user.model.entity.UserEntity;
+import com.huantz.trade.user.repository.UserRepository;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.core.context.SecurityContextHolder;
+
+import java.util.Optional;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.*;
+
+@ExtendWith(MockitoExtension.class)
+class UserCommandServiceImplTest {
+
+    @Mock
+    private UserRepository userRepository;
+
+    @Mock
+    private UserQueryService userQueryService;
+
+    @Mock
+    private UserEntityMapper userEntityMapper;
+
+    @InjectMocks
+    private UserCommandServiceImpl service;
+
+    @AfterEach
+    void tearDown() {
+        SecurityContextHolder.clearContext();
+    }
+
+    @Test
+    @DisplayName("用户注册")
+    void register() {
+        UserCommandServiceImpl.UserRegister register = new UserCommandServiceImpl.UserRegister("openid", "unionid", new Phone("123456", "13800138000"), new Email("test@test.com"));
+        UserEntity entity = new UserEntity();
+        
+        when(userEntityMapper.toUserEntity(register)).thenReturn(entity);
+        when(userRepository.save(entity)).thenReturn(entity);
+
+        UserEntity result = service.register(register);
+
+        assertThat(result).isNotNull();
+        verify(userRepository).save(entity);
+    }
+
+    @Test
+    @DisplayName("更新资料 - 用户不存在")
+    void updateProfileUserNotFound() {
+        LoginUserAuthentication auth = new LoginUserAuthentication(1L, "user");
+        SecurityContextHolder.getContext().setAuthentication(auth);
+        
+        when(userQueryService.getUserByUserId(1L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.updateProfile("nick", "avatar"))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("用户不存在");
+    }
+
+    @Test
+    @DisplayName("更新资料 - 成功")
+    void updateProfileSuccess() {
+        LoginUserAuthentication auth = new LoginUserAuthentication(1L, "user");
+        SecurityContextHolder.getContext().setAuthentication(auth);
+        
+        UserEntity entity = new UserEntity();
+        when(userQueryService.getUserByUserId(1L)).thenReturn(Optional.of(entity));
+        when(userEntityMapper.updateEntity("nick", "avatar", entity)).thenReturn(entity);
+
+        service.updateProfile("nick", "avatar");
+
+        verify(userRepository).saveAndFlush(entity);
+    }
+}
