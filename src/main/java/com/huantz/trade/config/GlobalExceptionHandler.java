@@ -62,8 +62,7 @@ public class GlobalExceptionHandler {
                         fieldError.getDefaultMessage() != null
                             ? fieldError.getDefaultMessage()
                             : "格式错误",
-                    (k1, k2) -> k1 // 重复字段保留第一个
-                    ));
+                    (k1, k2) -> k1));
     problem.setProperty("invalidParams", invalidParams);
 
     return problem;
@@ -72,9 +71,7 @@ public class GlobalExceptionHandler {
   // ================= 3. 兜底处理未捕获的系统异常 =================
   @ExceptionHandler(Exception.class)
   public ProblemDetail handleGeneralException(Exception ex) throws Exception {
-    // 认证/授权异常必须继续上抛，交给 Spring Security 的 ExceptionTranslationFilter
-    // 统一走 authenticationEntryPoint(401) / accessDeniedHandler(403)，
-    // 否则会被这里的兜底逻辑截胡成 500。
+
     if (ex instanceof AuthenticationException || ex instanceof AccessDeniedException) {
       throw ex;
     }
@@ -83,7 +80,7 @@ public class GlobalExceptionHandler {
         ProblemDetail.forStatusAndDetail(HttpStatus.INTERNAL_SERVER_ERROR, "系统繁忙，请稍后再试");
     problem.setTitle("系统内部错误");
     problem.setProperty("code", "INTERNAL_SERVER_ERROR");
-    problem.setProperty("timestamp", Instant.now());
+    problem.setProperty(TIMESTAMP, Instant.now());
     return problem;
   }
 }
