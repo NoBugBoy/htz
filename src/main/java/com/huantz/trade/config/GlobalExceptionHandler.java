@@ -62,8 +62,7 @@ public class GlobalExceptionHandler {
                         fieldError.getDefaultMessage() != null
                             ? fieldError.getDefaultMessage()
                             : "格式错误",
-                    (k1, k2) -> k1 // 重复字段保留第一个
-                    ));
+                    (k1, k2) -> k1));
     problem.setProperty("invalidParams", invalidParams);
 
     return problem;
