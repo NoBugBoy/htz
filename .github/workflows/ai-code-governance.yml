@@ -41,13 +41,23 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Run Semgrep SAST & Standards Scan
+        id: semgrep_scan
         run: |
           semgrep scan src/ \
             --config .semgrep.yml \
             --config "p/owasp-top-ten" \
             --config "p/cwe-top-25" \
             --config "p/java" \
+            --json-output=semgrep.json \
             --error
+
+      # 当 Semgrep 扫描拦截报错挂掉时，向飞书群推送告警卡片
+      - name: Send Feishu Alert on Security Failure
+        if: failure() && steps.semgrep_scan.outcome == 'failure'
+        env:
+          FEISHU_WEBHOOK_URL: ${{ secrets.FEISHU_WEBHOOK_URL }}
+        run: |
+          python3 .github/scripts/notify_feishu_semgrep.py
 
   # ── Step 2：安全扫描通过后，才进入 SonarCloud 质量分析与 AI 自动治理 ──────
   sonar-and-ai:
