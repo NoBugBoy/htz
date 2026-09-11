@@ -11,6 +11,7 @@ on:
       - 'src/**'       # 只有 src 目录下的代码变动才触发
       - 'pom.xml'      # 或 build.gradle
       - '.github/**'   # 包含 .github 变动触发
+      - '.semgrep.yml' # Semgrep 安全与规约配置变动
 
 # 显式声明所需权限
 permissions:
@@ -22,8 +23,9 @@ env:
   ACTIONS_RUNNER_FORCE_NODE24: "true"
 
 jobs:
-  sonar-and-ai:
-    # 过滤掉包含 [skip ci] 以及 AI 自动修复 PR 的合并提交，防止合并后循环触发
+  # ── Step 1：优先执行 Semgrep SAST 代码安全与阿里规约扫描 ────────
+  security-check:
+    name: Security & Code Standards Scan (Semgrep)
     if: |
       github.event_name == 'workflow_dispatch' ||
       (!contains(github.event.head_commit.message, '[skip ci]') &&
@@ -31,6 +33,26 @@ jobs:
        !contains(github.event.head_commit.message, 'ai-fix-') &&
        !startsWith(github.event.head_commit.message, 'fix: AI 根据 Issue') &&
        !startsWith(github.event.head_commit.message, 'fix: AI 自动批量修复'))
+    runs-on: ubuntu-latest
+    container:
+      image: semgrep/semgrep
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Run Semgrep SAST & Standards Scan
+        run: |
+          semgrep scan src/ \
+            --config .semgrep.yml \
+            --config "p/owasp-top-ten" \
+            --config "p/cwe-top-25" \
+            --config "p/java" \
+            --error
+
+  # ── Step 2：安全扫描通过后，才进入 SonarCloud 质量分析与 AI 自动治理 ──────
+  sonar-and-ai:
+    name: SonarCloud Analysis & AI Governance
+    needs: security-check
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code

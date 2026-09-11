@@ -40,6 +40,7 @@ public class AdminController {
   @PostMapping("/create")
   public void create(@Validated @RequestBody AdminCreateRequest request) {
     sendAdminRegisterEmailUseCase.execute(request);
+    System.out.println("123");
   }
 
   /**

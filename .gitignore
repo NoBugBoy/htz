@@ -31,3 +31,11 @@ build/
 
 ### VS Code ###
 .vscode/
+
+### Node & TypeSpec ###
+node_modules/
+tsp-output/
+
+### Python ###
+__pycache__/
+*.pyc
