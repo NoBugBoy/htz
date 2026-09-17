@@ -48,6 +48,7 @@ jobs:
             --config "p/owasp-top-ten" \
             --config "p/cwe-top-25" \
             --config "p/java" \
+            --config "p/spring" \
             --json-output=semgrep.json \
             --error
 

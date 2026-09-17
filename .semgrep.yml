@@ -1,39 +1,25 @@
 rules:
   # ==============================================================================
-  # 阿里巴巴 Java 开发规约 & Google Style 最佳实践规则集
+  # 一、高并发与内存安全规约 (Concurrency & Memory Safety)
   # ==============================================================================
 
-  # 1. 日志规约：生产环境禁止直接使用 System.out / System.err
-  - id: alibaba-avoid-system-out
+  # 1. ThreadLocal 内存泄露陷阱：线程池复用下必须在 finally 中 remove
+  - id: netflix-avoid-unremoved-threadlocal
     languages: [ java ]
-    message: "禁止直接使用 System.out/err 打印日志，容易导致日志混乱且无法按级别控制，必须使用日志门面（如 @Slf4j 配合 log.info/warn/error）。"
     severity: ERROR
+    message: "检测到使用 ThreadLocal 但未在 finally 中显式调用 .remove()。在线程池复用场景下，这会导致严重的数据串号与内存泄露（OOM）。"
     patterns:
-      - pattern-either:
-          - pattern: System.out.println(...)
-          - pattern: System.out.print(...)
-          - pattern: System.err.println(...)
-          - pattern: System.err.print(...)
+      - pattern: $TL.set(...)
+      - pattern-not-inside: |
+          try { ... } finally { ... $TL.remove(); ... }
     paths:
-      exclude:
-        - src/test/**
+      exclude: [ "src/test/**" ]
 
-  # 2. 异常处理规约：禁止直接调用 e.printStackTrace()
-  - id: alibaba-avoid-print-stack-trace
+  # 2. 线程池创建规约：禁止使用 Executors 创建无界队列或无界线程池
+  - id: google-avoid-executors-unbounded-pool
     languages: [ java ]
-    message: "禁止直接调用 e.printStackTrace()，否则在流量并发下容易因内部同步锁造成线程阻塞，且无法持久化日志，必须通过 log.error(\"...\", e) 输出异常。"
     severity: ERROR
-    patterns:
-      - pattern: $E.printStackTrace(...)
-    paths:
-      exclude:
-        - src/test/**
-
-  # 3. 并发编程规约：禁止使用 Executors 快速创建线程池（极易发生 OOM）
-  - id: alibaba-avoid-executors-thread-pool
-    languages: [ java ]
-    message: "禁止使用 Executors 创建线程池。newFixedThreadPool/newSingleThreadExecutor 使用了无界队列 LinkedBlockingQueue，堆积请求会导致 OOM；newCachedThreadPool 允许创建无限个线程，也会导致 OOM。必须通过 ThreadPoolExecutor 显式传参创建。"
-    severity: ERROR
+    message: "禁止使用 Executors 快速创建线程池。newFixedThreadPool/newSingleThreadExecutor 使用了无界队列，newCachedThreadPool 允许创建无限线程，高并发下极易引发 OOM。必须显式通过 ThreadPoolExecutor 声明有界队列与拒绝策略。"
     patterns:
       - pattern-either:
           - pattern: Executors.newFixedThreadPool(...)
@@ -41,11 +27,90 @@ rules:
           - pattern: Executors.newSingleThreadExecutor(...)
           - pattern: Executors.newScheduledThreadPool(...)
 
-  # 4. 时间日期规约：SimpleDateFormat 禁止使用大写 'YYYY' 跨年周
+  # 3. Spring 单例状态安全：禁止在 Controller / Service 中定义非 final 成员变量
+  - id: netflix-avoid-stateful-spring-bean
+    languages: [ java ]
+    severity: WARNING
+    message: "Spring Controller / Service 默认是单例。定义非 static 非 final 的可变成员字段会导致多线程并发竞态条件（Thread-safety bug）。"
+    patterns:
+      - pattern-inside: |
+          @$ANNOTATION
+          class $CLASS { ... }
+      - metavariable-regex:
+          metavariable: $ANNOTATION
+          regex: "(RestController|Controller|Service)"
+      - pattern: $TYPE $FIELD;
+      - pattern-not: final $TYPE $FIELD;
+      - pattern-not: static $TYPE $FIELD;
+      - pattern-not: private final $TYPE $FIELD;
+    paths:
+      exclude: [ "src/test/**" ]
+
+  # ==============================================================================
+  # 二、微服务事务与数据库性能规约 (Transaction & JPA Best Practices)
+  # ==============================================================================
+
+  # 4. 事务边界防腐：禁止将 @Transactional 加在 Controller 层
+  - id: spring-avoid-transactional-on-controller
+    languages: [ java ]
+    severity: ERROR
+    message: "@Transactional 严禁加在 Controller 层。事务应当且只能加在业务应用编排层（Service），否则会导致事务生命周期过长、连接池耗尽。"
+    patterns:
+      - pattern-inside: |
+          @$CTRL
+          class $CLASS { ... }
+      - metavariable-regex:
+          metavariable: $CTRL
+          regex: "(RestController|Controller)"
+      - pattern: |
+          @Transactional
+          $RET $METHOD(...) { ... }
+
+  # 5. 防雪崩：严禁直接拼接 SQL 导致注入
+  - id: owasp-avoid-sql-string-concatenation
+    languages: [ java ]
+    severity: ERROR
+    message: "严禁通过字符串拼接（+ 或 String.format）构造 SQL 传递给底层执行，存在致命的 SQL 注入风险。必须使用预编译占位符（? 或 :param）。"
+    patterns:
+      - pattern-either:
+          - pattern: $STMT.executeQuery($X + $Y)
+          - pattern: $STMT.executeUpdate($X + $Y)
+          - pattern: $STMT.execute($X + $Y)
+          - pattern: $EM.createQuery($X + $Y)
+          - pattern: $EM.createNativeQuery($X + $Y)
+
+  # ==============================================================================
+  # 三、现代 Java (JDK 21/25) 语义与代码坏味道 (Code Smells & Bug Prevention)
+  # ==============================================================================
+
+  # 6. BigDecimal 浮点精度陷阱：严禁使用 double 构造 BigDecimal
+  - id: google-avoid-bigdecimal-double-constructor
+    languages: [ java ]
+    severity: ERROR
+    message: "禁止使用 new BigDecimal(double)，例如 new BigDecimal(0.1) 实际值是 0.10000000000000000555...，存在财务精度损失风险。请使用 BigDecimal.valueOf(0.1) 或 new BigDecimal(\"0.1\")。"
+    patterns:
+      - pattern: new BigDecimal((double) $VAL)
+      - pattern: new BigDecimal($FLOAT_OR_DOUBLE)
+      - metavariable-type:
+          metavariable: $FLOAT_OR_DOUBLE
+          type: double
+
+  # 7. 盲目解包：禁止未经检查直接调用 Optional.get()
+  - id: google-avoid-optional-get
+    languages: [ java ]
+    severity: WARNING
+    message: "严禁直接调用 Optional.get()，若为空会抛出 NoSuchElementException。推荐使用 orElseThrow()、map/ifPresent 或 Java 21+ 模式匹配解包。"
+    patterns:
+      - pattern: $OPT.get()
+      - metavariable-type:
+          metavariable: $OPT
+          type: java.util.Optional
+
+  # 8. 时间日期规约：SimpleDateFormat 禁止使用大写 'YYYY' 跨年周
   - id: alibaba-avoid-date-format-week-year
     languages: [ java ]
-    message: "日期格式化时，年份禁止使用大写 'YYYY'。'YYYY' 表示 Week based year（当周所属年份），在每年年底与年初跨年周会导致算错年份（如 2023-12-31 会被格式化为 2024）。请统一使用小写 'yyyy'。"
     severity: ERROR
+    message: "日期格式化时，年份严禁使用大写 'YYYY'（Week-based year）。在每年年底年初跨周时会导致算错年份。请统一使用小写 'yyyy'。"
     patterns:
       - pattern-either:
           - pattern: new SimpleDateFormat($FMT, ...)
@@ -54,26 +119,41 @@ rules:
           metavariable: $FMT
           regex: ".*YYYY.*"
 
-  # 5. 线程安全规约：严禁调用 Thread.stop() / suspend() / resume() 等高危废弃方法
-  - id: alibaba-avoid-thread-stop-suspend
-    languages: [ java ]
-    message: "禁止调用 Thread.stop()、Thread.suspend()、Thread.resume()，这些方法会直接释放锁导致数据状态不一致死锁，Java 官方已明确废弃。"
-    severity: ERROR
-    patterns:
-      - pattern-either:
-          - pattern: $T.stop()
-          - pattern: $T.suspend()
-          - pattern: $T.resume()
+  # ==============================================================================
+  # 四、日志、异常与敏感信息安全 (Logging & Secrets)
+  # ==============================================================================
 
-  # 6. 安全规约：SQL 拼接防注入拦截
-  - id: alibaba-sql-injection-concatenation
+  # 9. 禁止直接使用 System.out / System.err
+  - id: alibaba-avoid-system-out
     languages: [ java ]
-    message: "严禁直接使用字符串拼接（+ 或 String.format）构造 SQL 语句传给数据库执行，存在致命的 SQL 注入风险，必须使用预编译占位符（? 或 JPA/QueryDSL 参数绑定）。"
     severity: ERROR
+    message: "禁止直接使用 System.out/err 输出，容易导致日志交错混乱且无法按级别和环境控制，必须使用 SLF4J 日志门面（@Slf4j）。"
     patterns:
       - pattern-either:
-          - pattern: $STMT.executeQuery($X + $Y)
-          - pattern: $STMT.executeUpdate($X + $Y)
-          - pattern: $STMT.execute($X + $Y)
-          - pattern: $EM.createQuery($X + $Y)
-          - pattern: $EM.createNativeQuery($X + $Y)
+          - pattern: System.out.println(...)
+          - pattern: System.out.print(...)
+          - pattern: System.err.println(...)
+          - pattern: System.err.print(...)
+    paths:
+      exclude: [ "src/test/**" ]
+
+  # 10. 禁止直接调用 e.printStackTrace()
+  - id: alibaba-avoid-print-stack-trace
+    languages: [ java ]
+    severity: ERROR
+    message: "禁止直接调用 e.printStackTrace()，在高并发下其内部同步锁容易造成线程阻塞，必须使用 log.error(\"...\", e)。"
+    patterns:
+      - pattern: $E.printStackTrace(...)
+    paths:
+      exclude: [ "src/test/**" ]
+
+  # 11. 严禁使用破损的弱哈希算法（MD5 / SHA-1）进行数据加密或签名
+  - id: owasp-avoid-broken-hash
+    languages: [ java ]
+    severity: ERROR
+    message: "严禁使用 MD5 或 SHA-1 作为密码哈希或签名，它们已被证明存在碰撞漏洞。密码存储请使用 BCrypt / Argon2，哈希校验请使用 SHA-256 或 SHA-512。"
+    patterns:
+      - pattern: MessageDigest.getInstance($ALG)
+      - metavariable-regex:
+          metavariable: $ALG
+          regex: "\"(MD5|SHA-1|SHA1)\""
