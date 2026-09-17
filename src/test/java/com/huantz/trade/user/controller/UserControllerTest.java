@@ -1,33 +1,62 @@
 package com.huantz.trade.user.controller;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.verify;
 
+import com.huantz.trade.BaseControllerIntegrationTest;
+import com.huantz.trade.user.model.entity.UserEntity;
 import com.huantz.trade.user.service.UserCommandService;
+import com.huantz.trade.user.service.impl.UserCommandServiceImpl.UserRegister;
+import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
+import org.springframework.beans.factory.annotation.Autowired;
 
-@ExtendWith(MockitoExtension.class)
-class UserControllerTest {
+class UserControllerTest extends BaseControllerIntegrationTest {
 
-  @Mock private UserCommandService userCommandService;
-
-  @InjectMocks private UserController controller;
+  @Autowired private UserCommandService userCommandService;
 
   @Test
-  @DisplayName("更新个人资料接口")
-  void testUpdateProfile() {
+  @DisplayName("未认证访问个人中心接口返回401")
+  void testUnauthorized() {
     UserController.UpdateProfileRequest request =
-        new UserController.UpdateProfileRequest("nick", "avatar");
-    ResponseEntity<Void> response = controller.updateProfile(request);
+        new UserController.UpdateProfileRequest("NewNick", "https://img.com/a.png");
 
-    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
-    verify(userCommandService).updateProfile("nick", "avatar");
+    givenAnonymous()
+        .body(request)
+        .when()
+        .put("/user/update/profile")
+        .then()
+        .statusCode(401);
+  }
+
+  @Test
+  @DisplayName("登录用户修改个人资料成功返回204")
+  void testUpdateProfileSuccess() {
+    String openId = "openid_" + UUID.randomUUID().toString().substring(0, 8);
+    UserEntity user = userCommandService.register(new UserRegister(openId, "unionid_" + openId, null, null));
+    Long userId = user.getId();
+
+    UserController.UpdateProfileRequest request =
+        new UserController.UpdateProfileRequest("MyNickName", "https://example.com/avatar.png");
+
+    givenUser(userId)
+        .body(request)
+        .when()
+        .put("/user/update/profile")
+        .then()
+        .statusCode(204);
+  }
+
+  @Test
+  @DisplayName("登录用户修改个人资料入参非法返回400")
+  void testUpdateProfileValidationFailure() {
+    UserController.UpdateProfileRequest request =
+        new UserController.UpdateProfileRequest("", "");
+
+    givenUser(1L)
+        .body(request)
+        .when()
+        .put("/user/update/profile")
+        .then()
+        .statusCode(400);
   }
 }

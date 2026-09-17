@@ -1,65 +1,77 @@
 package com.huantz.trade.user.controller.admin;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.*;
+import static org.hamcrest.Matchers.notNullValue;
 
+import com.huantz.trade.BaseControllerIntegrationTest;
+import com.huantz.trade.enums.AdminRoleEnum;
 import com.huantz.trade.user.model.request.AdminLoginRequest;
-import com.huantz.trade.user.model.request.ResetPasswordRequest;
-import com.huantz.trade.user.model.response.AccessToken;
 import com.huantz.trade.user.service.AdminCommandService;
-import com.huantz.trade.user.usecase.admin.AdminLoginUseCase;
-import com.huantz.trade.user.usecase.admin.AdminRegisterUseCase;
-import com.huantz.trade.user.usecase.admin.SendAdminRestPasswordEmailUseCase;
+import com.huantz.trade.user.service.AdminRoleService;
+import java.util.Map;
+import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
+import org.springframework.beans.factory.annotation.Autowired;
 
-@ExtendWith(MockitoExtension.class)
-class AdminAuthControllerTest {
+class AdminAuthControllerTest extends BaseControllerIntegrationTest {
 
-  @Mock private AdminRegisterUseCase adminRegisterUseCase;
-  @Mock private AdminLoginUseCase adminLoginUseCase;
-  @Mock private AdminCommandService adminCommandService;
-  @Mock private SendAdminRestPasswordEmailUseCase sendAdminRestPasswordEmailUseCase;
-
-  @InjectMocks private AdminAuthController controller;
+  @Autowired private AdminCommandService adminCommandService;
+  @Autowired private AdminRoleService adminRoleService;
+  @Autowired private org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
 
   @Test
-  @DisplayName("通过 OTT 完成注册")
-  void testCompleteRegister() {
-    when(adminRegisterUseCase.execute("ott-1")).thenReturn("token-1");
-    AccessToken token = controller.completeRegister("ott-1");
-    assertThat(token.token()).isEqualTo("token-1");
+  @DisplayName("管理员登录失败 - 用户名或密码错误返回400")
+  void testLoginFailure() {
+    AdminLoginRequest request =
+        new AdminLoginRequest("nonexistent@example.com", "wrongpassword", null, null);
+
+    givenAnonymous()
+        .body(request)
+        .when()
+        .post("/admin/auth/login")
+        .then()
+        .statusCode(400);
   }
 
   @Test
-  @DisplayName("通过 OTT 完成密码重置")
-  void testCompleteReset() {
-    ResponseEntity<Void> response = controller.completeReset("ott-2");
-    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.ACCEPTED);
-    verify(adminCommandService).resetPassword("ott-2");
+  @DisplayName("管理员登录成功 - 返回Token")
+  void testLoginSuccess() {
+    String email = "admin_" + UUID.randomUUID().toString().substring(0, 8) + "@test.com";
+    String password = "adminPassword123";
+
+    Long adminId = adminCommandService.saveAdminUser(email, passwordEncoder.encode(password));
+    adminRoleService.assignRole(adminId, AdminRoleEnum.ADMIN);
+
+    AdminLoginRequest request = new AdminLoginRequest(email, password, null, null);
+
+    givenAnonymous()
+        .body(request)
+        .when()
+        .post("/admin/auth/login")
+        .then()
+        .statusCode(200)
+        .body("token", notNullValue());
   }
 
   @Test
-  @DisplayName("管理员登录")
-  void testLogin() {
-    AdminLoginRequest request = new AdminLoginRequest("admin@test.com", "pwd", "cid", "pubkey");
-    when(adminLoginUseCase.execute(request)).thenReturn("token-login");
-    AccessToken token = controller.login(request);
-    assertThat(token.token()).isEqualTo("token-login");
+  @DisplayName("发送重置密码邮件参数校验失败返回400")
+  void testResetPasswordSendValidationFailure() {
+    givenAnonymous()
+        .body(Map.of("email", "", "newPassword", ""))
+        .when()
+        .post("/admin/auth/reset-password-send")
+        .then()
+        .statusCode(400);
   }
 
   @Test
-  @DisplayName("发送重置密码邮件")
-  void testResetPasswordSend() {
-    ResetPasswordRequest request = new ResetPasswordRequest("admin@test.com", "newpwd");
-    ResponseEntity<Void> response = controller.resetPasswordSend(request);
-    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.ACCEPTED);
-    verify(sendAdminRestPasswordEmailUseCase).execute(request);
+  @DisplayName("使用无效OTT完成注册返回400")
+  void testCompleteRegisterInvalidOtt() {
+    givenAnonymous()
+        .queryParam("ott", "invalid-ott-token")
+        .when()
+        .get("/admin/auth/complete-register")
+        .then()
+        .statusCode(400);
   }
 }

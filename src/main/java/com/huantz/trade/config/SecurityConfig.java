@@ -50,7 +50,8 @@ public class SecurityConfig {
                         "/admin/auth/**", // 后台管理认证
                         "/v3/api-docs/**", // OpenAPI / Swagger 文档
                         "/swagger-ui/**",
-                        "/actuator/health" // 探活检查
+                        "/actuator/health", // 探活检查
+                        "/uploads/**" // 静态上传图片资源
                         )
                     .permitAll()
                     .requestMatchers("/admin/**")

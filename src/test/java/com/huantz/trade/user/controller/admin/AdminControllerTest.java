@@ -1,58 +1,86 @@
 package com.huantz.trade.user.controller.admin;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.*;
+import static org.hamcrest.Matchers.notNullValue;
 
-import com.huantz.trade.user.AdminQueryService;
+import com.huantz.trade.BaseControllerIntegrationTest;
+import com.huantz.trade.enums.AdminRoleEnum;
 import com.huantz.trade.user.model.request.AdminCreateRequest;
-import com.huantz.trade.user.model.request.AdminPageRequest;
-import com.huantz.trade.user.model.response.AdminItemResponse;
 import com.huantz.trade.user.service.AdminCommandService;
-import com.huantz.trade.user.usecase.admin.SendAdminRegisterEmailUseCase;
-import java.util.List;
+import com.huantz.trade.user.service.AdminRoleService;
+import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
+import org.springframework.beans.factory.annotation.Autowired;
 
-@ExtendWith(MockitoExtension.class)
-class AdminControllerTest {
+class AdminControllerTest extends BaseControllerIntegrationTest {
 
-  @Mock private SendAdminRegisterEmailUseCase sendAdminRegisterEmailUseCase;
-  @Mock private AdminCommandService adminCommandService;
-  @Mock private AdminQueryService adminQueryService;
-
-  @InjectMocks private AdminController controller;
+  @Autowired private AdminCommandService adminCommandService;
+  @Autowired private AdminRoleService adminRoleService;
+  @Autowired private org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
 
   @Test
-  @DisplayName("分页查询管理员")
-  void testPage() {
-    AdminPageRequest request = new AdminPageRequest();
-    Page<AdminItemResponse> expected = new PageImpl<>(List.of());
-    when(adminQueryService.page(request)).thenReturn(expected);
-
-    Page<AdminItemResponse> page = controller.page(request);
-    assertThat(page).isSameAs(expected);
+  @DisplayName("未认证访问管理员管理接口返回401")
+  void testUnauthorized() {
+    givenAnonymous()
+        .when()
+        .get("/admin")
+        .then()
+        .statusCode(401);
   }
 
   @Test
-  @DisplayName("创建管理员")
-  void testCreate() {
-    AdminCreateRequest request = new AdminCreateRequest("admin@test.com", "password123");
-    controller.create(request);
-    verify(sendAdminRegisterEmailUseCase).execute(request);
+  @DisplayName("普通用户访问管理员管理接口返回403")
+  void testForbiddenForRegularUser() {
+    givenUser(999L)
+        .when()
+        .get("/admin")
+        .then()
+        .statusCode(403);
   }
 
   @Test
-  @DisplayName("重置密码")
+  @DisplayName("管理员分页查询管理员列表成功返回200")
+  void testPageAdmins() {
+    givenAdmin()
+        .when()
+        .get("/admin")
+        .then()
+        .statusCode(200)
+        .body("content", notNullValue());
+  }
+
+  @Test
+  @DisplayName("管理员创建新管理员邀请成功返回200")
+  void testCreateAdmin() {
+    String email = "invite_" + UUID.randomUUID().toString().substring(0, 8) + "@test.com";
+    AdminCreateRequest request = new AdminCreateRequest(email, "password123");
+
+    givenAdmin()
+        .body(request)
+        .when()
+        .post("/admin/create")
+        .then()
+        .statusCode(200);
+  }
+
+  @Test
+  @DisplayName("管理员修改自身密码成功")
   void testResetPassword() {
+    String email = "reset_admin_" + UUID.randomUUID().toString().substring(0, 8) + "@test.com";
+    String oldPassword = "oldPassword123";
+    String newPassword = "newPassword456";
+
+    Long adminId = adminCommandService.saveAdminUser(email, passwordEncoder.encode(oldPassword));
+    adminRoleService.assignRole(adminId, AdminRoleEnum.ADMIN);
+
     AdminController.ResetPasswordRequest request =
-        new AdminController.ResetPasswordRequest("old", "new");
-    controller.resetPassword(request);
-    verify(adminCommandService).resetPassword("old", "new");
+        new AdminController.ResetPasswordRequest(oldPassword, newPassword);
+
+    givenAdmin(adminId)
+        .body(request)
+        .when()
+        .post("/admin/reset/password")
+        .then()
+        .statusCode(200);
   }
 }

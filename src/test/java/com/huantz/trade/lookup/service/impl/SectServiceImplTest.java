@@ -59,7 +59,9 @@ class SectServiceImplTest {
   void pageWithCondition() {
     SectPageRequest request = new SectPageRequest();
     request.setSectName("Sect 1");
-    when(sectRepository.findAll(any(com.querydsl.core.types.Predicate.class), any(org.springframework.data.domain.Pageable.class)))
+    when(sectRepository.findAll(
+            any(com.querydsl.core.types.Predicate.class),
+            any(org.springframework.data.domain.Pageable.class)))
         .thenReturn(new PageImpl<>(Collections.emptyList()));
 
     Page<SectPageResponse> result = service.page(request);

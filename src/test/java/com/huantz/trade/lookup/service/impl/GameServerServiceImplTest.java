@@ -59,7 +59,9 @@ class GameServerServiceImplTest {
   void pageWithCondition() {
     GameServerPageRequest request = new GameServerPageRequest();
     request.setGameServerName("Server 1");
-    when(repository.findAll(any(com.querydsl.core.types.Predicate.class), any(org.springframework.data.domain.Pageable.class)))
+    when(repository.findAll(
+            any(com.querydsl.core.types.Predicate.class),
+            any(org.springframework.data.domain.Pageable.class)))
         .thenReturn(new PageImpl<>(Collections.emptyList()));
 
     Page<GameSeverPageResponse> result = service.page(request);

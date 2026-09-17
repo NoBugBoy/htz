@@ -1,32 +1,31 @@
 package com.huantz.trade.lookup.controller;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.when;
+import static org.hamcrest.Matchers.notNullValue;
 
-import com.huantz.trade.lookup.SectService;
-import com.huantz.trade.lookup.model.response.SectOptionResponse;
-import java.util.List;
+import com.huantz.trade.BaseControllerIntegrationTest;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
 
-@ExtendWith(MockitoExtension.class)
-class SectControllerTest {
-
-  @Mock private SectService sectService;
-
-  @InjectMocks private SectController controller;
+class SectControllerTest extends BaseControllerIntegrationTest {
 
   @Test
-  @DisplayName("获取门派选项")
-  void testOptions() {
-    List<SectOptionResponse> expected = List.of(new SectOptionResponse(1L, "S1"));
-    when(sectService.options()).thenReturn(expected);
+  @DisplayName("未认证访问门派选项接口返回401")
+  void testOptionsUnauthorized() {
+    givenAnonymous()
+        .when()
+        .get("/sect")
+        .then()
+        .statusCode(401);
+  }
 
-    List<SectOptionResponse> result = controller.options();
-    assertThat(result).isSameAs(expected);
+  @Test
+  @DisplayName("登录用户访问门派选项接口成功返回200")
+  void testOptionsSuccess() {
+    givenUser(1L)
+        .when()
+        .get("/sect")
+        .then()
+        .statusCode(200)
+        .body(notNullValue());
   }
 }

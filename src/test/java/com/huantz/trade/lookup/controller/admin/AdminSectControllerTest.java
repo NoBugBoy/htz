@@ -1,65 +1,85 @@
 package com.huantz.trade.lookup.controller.admin;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.*;
+import static org.hamcrest.Matchers.notNullValue;
 
-import com.huantz.trade.lookup.SectService;
-import com.huantz.trade.lookup.model.request.SectPageRequest;
+import com.huantz.trade.BaseControllerIntegrationTest;
 import com.huantz.trade.lookup.model.request.SectRequest;
-import com.huantz.trade.lookup.model.response.SectPageResponse;
-import java.util.List;
+import com.huantz.trade.lookup.repository.SectRepository;
+import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
+import org.springframework.beans.factory.annotation.Autowired;
 
-@ExtendWith(MockitoExtension.class)
-class AdminSectControllerTest {
+class AdminSectControllerTest extends BaseControllerIntegrationTest {
 
-  @Mock private SectService sectService;
-
-  @InjectMocks private AdminSectController controller;
+  @Autowired private SectRepository sectRepository;
 
   @Test
-  @DisplayName("分页查询门派")
-  void testPage() {
-    SectPageRequest request = new SectPageRequest();
-    Page<SectPageResponse> expectedPage = new PageImpl<>(List.of());
-    when(sectService.page(request)).thenReturn(expectedPage);
-
-    Page<SectPageResponse> page = controller.page(request);
-    assertThat(page).isSameAs(expectedPage);
+  @DisplayName("未认证访问管理后台门派接口返回401")
+  void testUnauthorized() {
+    givenAnonymous()
+        .when()
+        .get("/admin/sect/page")
+        .then()
+        .log().all()
+        .statusCode(401);
   }
 
   @Test
-  @DisplayName("删除门派")
-  void testDelete() {
-    ResponseEntity<Void> response = controller.delete(1L);
-    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
-    verify(sectService).deleteById(1L);
+  @DisplayName("普通用户访问管理后台门派接口返回403")
+  void testForbiddenForRegularUser() {
+    givenUser(999L)
+        .when()
+        .get("/admin/sect/page")
+        .then()
+        .log().ifValidationFails()
+        .statusCode(403);
   }
 
   @Test
-  @DisplayName("新增门派")
-  void testAdd() {
-    SectRequest request = new SectRequest("Sect1");
-    ResponseEntity<Void> response = controller.add(request);
-    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.ACCEPTED);
-    verify(sectService).createSect(request);
-  }
+  @DisplayName("管理员成功新增、分页查询、更新并删除门派")
+  void testAdminSectLifecycle() {
+    String sectName = "TestSect_" + UUID.randomUUID().toString().substring(0, 8);
+    SectRequest createRequest = new SectRequest(sectName);
 
-  @Test
-  @DisplayName("更新门派")
-  void testUpdate() {
-    SectRequest request = new SectRequest("Sect2");
-    ResponseEntity<Void> response = controller.update(1L, request);
-    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
-    verify(sectService).update(1L, request);
+    // 1. 新增门派
+    givenAdmin()
+        .body(createRequest)
+        .when()
+        .post("/admin/sect")
+        .then()
+        .log().ifValidationFails()
+        .statusCode(202);
+
+    // 2. 分页查询验证新增存在
+    givenAdmin()
+        .queryParam("sectName", sectName)
+        .when()
+        .get("/admin/sect/page")
+        .then()
+        .statusCode(200)
+        .body("content", notNullValue());
+
+    var entity = sectRepository.findAll().stream()
+        .filter(s -> sectName.equals(s.getSectName()))
+        .findFirst()
+        .orElseThrow();
+    Long sectId = entity.getId();
+
+    // 3. 更新门派
+    String updatedName = sectName + "_updated";
+    givenAdmin()
+        .body(new SectRequest(updatedName))
+        .when()
+        .put("/admin/sect/{sectId}", sectId)
+        .then()
+        .statusCode(204);
+
+    // 4. 删除门派
+    givenAdmin()
+        .when()
+        .delete("/admin/sect/{sectId}", sectId)
+        .then()
+        .statusCode(204);
   }
 }

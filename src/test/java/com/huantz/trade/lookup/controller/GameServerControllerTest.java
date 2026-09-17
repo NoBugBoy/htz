@@ -1,32 +1,31 @@
 package com.huantz.trade.lookup.controller;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.when;
+import static org.hamcrest.Matchers.notNullValue;
 
-import com.huantz.trade.lookup.GameServerService;
-import com.huantz.trade.lookup.model.response.GameServerOptionResponse;
-import java.util.List;
+import com.huantz.trade.BaseControllerIntegrationTest;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
 
-@ExtendWith(MockitoExtension.class)
-class GameServerControllerTest {
-
-  @Mock private GameServerService gameServerService;
-
-  @InjectMocks private GameServerController controller;
+class GameServerControllerTest extends BaseControllerIntegrationTest {
 
   @Test
-  @DisplayName("获取服务器选项")
-  void testOptions() {
-    List<GameServerOptionResponse> expected = List.of(new GameServerOptionResponse(1L, "S1"));
-    when(gameServerService.options()).thenReturn(expected);
+  @DisplayName("未认证访问游戏服务器选项接口返回401")
+  void testOptionsUnauthorized() {
+    givenAnonymous()
+        .when()
+        .get("/server")
+        .then()
+        .statusCode(401);
+  }
 
-    List<GameServerOptionResponse> result = controller.options();
-    assertThat(result).isSameAs(expected);
+  @Test
+  @DisplayName("登录用户访问游戏服务器选项接口成功返回200")
+  void testOptionsSuccess() {
+    givenUser(1L)
+        .when()
+        .get("/server")
+        .then()
+        .statusCode(200)
+        .body(notNullValue());
   }
 }
