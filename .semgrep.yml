@@ -40,6 +40,10 @@ rules:
           metavariable: $ANNOTATION
           regex: "(RestController|Controller|Service)"
       - pattern: $TYPE $FIELD;
+      - pattern-not-inside: |
+          $RET $METHOD(...) { ... }
+      - pattern-not-inside: |
+          $METHOD(...) { ... }
       - pattern-not: final $TYPE $FIELD;
       - pattern-not: static $TYPE $FIELD;
       - pattern-not: private final $TYPE $FIELD;

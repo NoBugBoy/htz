@@ -36,7 +36,7 @@ public class FileStorageConfig {
         && StringUtils.hasText(minioProperties.getSecretKey())
         && StringUtils.hasText(minioProperties.getBucketName())) {
       log.info("启用 MinIO 对象存储适配器 (MinioStorageAdapter)");
-      return new MinioStorageAdapter(minioClient.get(), minioProperties);
+      return new MinioStorageAdapter(minioClient.orElseThrow(), minioProperties);
     }
 
     // 2. 其次装配阿里云 OSS
@@ -46,7 +46,7 @@ public class FileStorageConfig {
         && StringUtils.hasText(aliyunOssProperties.getAccessKeySecret())
         && StringUtils.hasText(aliyunOssProperties.getBucketName())) {
       log.info("启用阿里云 OSS 存储适配器 (AliyunOssStorageAdapter)");
-      return new AliyunOssStorageAdapter(ossClient.get(), aliyunOssProperties);
+      return new AliyunOssStorageAdapter(ossClient.orElseThrow(), aliyunOssProperties);
     }
 
     // 3. 降级使用本地文件存储
