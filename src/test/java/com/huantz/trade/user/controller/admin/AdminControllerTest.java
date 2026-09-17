@@ -21,32 +21,19 @@ class AdminControllerTest extends BaseControllerIntegrationTest {
   @Test
   @DisplayName("未认证访问管理员管理接口返回401")
   void testUnauthorized() {
-    givenAnonymous()
-        .when()
-        .get("/admin")
-        .then()
-        .statusCode(401);
+    givenAnonymous().when().get("/admin").then().statusCode(401);
   }
 
   @Test
   @DisplayName("普通用户访问管理员管理接口返回403")
   void testForbiddenForRegularUser() {
-    givenUser(999L)
-        .when()
-        .get("/admin")
-        .then()
-        .statusCode(403);
+    givenUser(999L).when().get("/admin").then().statusCode(403);
   }
 
   @Test
   @DisplayName("管理员分页查询管理员列表成功返回200")
   void testPageAdmins() {
-    givenAdmin()
-        .when()
-        .get("/admin")
-        .then()
-        .statusCode(200)
-        .body("content", notNullValue());
+    givenAdmin().when().get("/admin").then().statusCode(200).body("content", notNullValue());
   }
 
   @Test
@@ -55,12 +42,7 @@ class AdminControllerTest extends BaseControllerIntegrationTest {
     String email = "invite_" + UUID.randomUUID().toString().substring(0, 8) + "@test.com";
     AdminCreateRequest request = new AdminCreateRequest(email, "password123");
 
-    givenAdmin()
-        .body(request)
-        .when()
-        .post("/admin/create")
-        .then()
-        .statusCode(200);
+    givenAdmin().body(request).when().post("/admin/create").then().statusCode(200);
   }
 
   @Test
@@ -76,11 +58,6 @@ class AdminControllerTest extends BaseControllerIntegrationTest {
     AdminController.ResetPasswordRequest request =
         new AdminController.ResetPasswordRequest(oldPassword, newPassword);
 
-    givenAdmin(adminId)
-        .body(request)
-        .when()
-        .post("/admin/reset/password")
-        .then()
-        .statusCode(200);
+    givenAdmin(adminId).body(request).when().post("/admin/reset/password").then().statusCode(200);
   }
 }

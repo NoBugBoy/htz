@@ -19,7 +19,8 @@ public class MinioProperties {
   private String accessKey = "G7PfPL3l0vS2QnWG54pa";
 
   /** MinIO SecretKey */
-  private String secretKey = "4Rl2YtYolRgaloURhOhTOWfQRqHfTDvovgy51jrR";
+  /** MinIO SecretKey（通过配置文件或环境变量注入，禁止在源码中硬编码） */
+  private String secretKey;
 
   /** 存储桶名称 (Bucket) */
   private String bucketName = "trade";

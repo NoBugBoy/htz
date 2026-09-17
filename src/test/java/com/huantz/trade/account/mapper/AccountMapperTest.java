@@ -55,6 +55,11 @@ class AccountMapperTest {
 
     // 3. 断言验证
     assertThat(response).isNotNull();
+    assertBaseFieldsMapped(response, now);
+    assertExtraFieldsAndSellerMapped(response);
+  }
+
+  private void assertBaseFieldsMapped(AccountPageResponse response, LocalDateTime now) {
     // 验证同名实体属性自动匹配
     assertThat(response.id()).isEqualTo(100L);
     assertThat(response.title()).isEqualTo("全服第一大唐");
@@ -77,7 +82,9 @@ class AccountMapperTest {
     assertThat(response.emailRealNameVerified()).isTrue();
     assertThat(response.accountStatus()).isEqualTo(AccountStatusEnum.LISTED);
     assertThat(response.createTime()).isEqualTo(now);
+  }
 
+  private void assertExtraFieldsAndSellerMapped(AccountPageResponse response) {
     // 验证额外方法参数直接映射
     assertThat(response.sectName()).isEqualTo("大唐官府");
     assertThat(response.serverName()).isEqualTo("千里之外");

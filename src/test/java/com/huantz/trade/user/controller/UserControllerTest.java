@@ -1,6 +1,5 @@
 package com.huantz.trade.user.controller;
 
-
 import com.huantz.trade.BaseControllerIntegrationTest;
 import com.huantz.trade.user.model.entity.UserEntity;
 import com.huantz.trade.user.service.UserCommandService;
@@ -20,43 +19,28 @@ class UserControllerTest extends BaseControllerIntegrationTest {
     UserController.UpdateProfileRequest request =
         new UserController.UpdateProfileRequest("NewNick", "https://img.com/a.png");
 
-    givenAnonymous()
-        .body(request)
-        .when()
-        .put("/user/update/profile")
-        .then()
-        .statusCode(401);
+    givenAnonymous().body(request).when().put("/user/update/profile").then().statusCode(401);
   }
 
   @Test
   @DisplayName("登录用户修改个人资料成功返回204")
   void testUpdateProfileSuccess() {
     String openId = "openid_" + UUID.randomUUID().toString().substring(0, 8);
-    UserEntity user = userCommandService.register(new UserRegister(openId, "unionid_" + openId, null, null));
+    UserEntity user =
+        userCommandService.register(new UserRegister(openId, "unionid_" + openId, null, null));
     Long userId = user.getId();
 
     UserController.UpdateProfileRequest request =
         new UserController.UpdateProfileRequest("MyNickName", "https://example.com/avatar.png");
 
-    givenUser(userId)
-        .body(request)
-        .when()
-        .put("/user/update/profile")
-        .then()
-        .statusCode(204);
+    givenUser(userId).body(request).when().put("/user/update/profile").then().statusCode(204);
   }
 
   @Test
   @DisplayName("登录用户修改个人资料入参非法返回400")
   void testUpdateProfileValidationFailure() {
-    UserController.UpdateProfileRequest request =
-        new UserController.UpdateProfileRequest("", "");
+    UserController.UpdateProfileRequest request = new UserController.UpdateProfileRequest("", "");
 
-    givenUser(1L)
-        .body(request)
-        .when()
-        .put("/user/update/profile")
-        .then()
-        .statusCode(400);
+    givenUser(1L).body(request).when().put("/user/update/profile").then().statusCode(400);
   }
 }

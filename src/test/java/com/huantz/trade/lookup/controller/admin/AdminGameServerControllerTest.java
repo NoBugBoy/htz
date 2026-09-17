@@ -17,21 +17,13 @@ class AdminGameServerControllerTest extends BaseControllerIntegrationTest {
   @Test
   @DisplayName("未认证访问管理后台服务器接口返回401")
   void testUnauthorized() {
-    givenAnonymous()
-        .when()
-        .get("/admin/server/page")
-        .then()
-        .statusCode(401);
+    givenAnonymous().when().get("/admin/server/page").then().statusCode(401);
   }
 
   @Test
   @DisplayName("普通用户访问管理后台服务器接口返回403")
   void testForbiddenForRegularUser() {
-    givenUser(999L)
-        .when()
-        .get("/admin/server/page")
-        .then()
-        .statusCode(403);
+    givenUser(999L).when().get("/admin/server/page").then().statusCode(403);
   }
 
   @Test
@@ -41,12 +33,7 @@ class AdminGameServerControllerTest extends BaseControllerIntegrationTest {
     GameServerRequest createRequest = new GameServerRequest(serverName);
 
     // 1. 新增游戏服务器
-    givenAdmin()
-        .body(createRequest)
-        .when()
-        .post("/admin/server")
-        .then()
-        .statusCode(202);
+    givenAdmin().body(createRequest).when().post("/admin/server").then().statusCode(202);
 
     // 2. 分页查询验证新增存在
     givenAdmin()
@@ -57,10 +44,11 @@ class AdminGameServerControllerTest extends BaseControllerIntegrationTest {
         .statusCode(200)
         .body("content", notNullValue());
 
-    var entity = gameServerRepository.findAll().stream()
-        .filter(s -> serverName.equals(s.getServerName()))
-        .findFirst()
-        .orElseThrow();
+    var entity =
+        gameServerRepository.findAll().stream()
+            .filter(s -> serverName.equals(s.getServerName()))
+            .findFirst()
+            .orElseThrow();
     Long serverId = entity.getId();
 
     // 3. 更新游戏服务器
@@ -73,10 +61,6 @@ class AdminGameServerControllerTest extends BaseControllerIntegrationTest {
         .statusCode(204);
 
     // 4. 删除游戏服务器
-    givenAdmin()
-        .when()
-        .delete("/admin/server/{gameServerId}", serverId)
-        .then()
-        .statusCode(204);
+    givenAdmin().when().delete("/admin/server/{gameServerId}", serverId).then().statusCode(204);
   }
 }
