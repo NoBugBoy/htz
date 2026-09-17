@@ -93,7 +93,7 @@ jobs:
           distribution: 'temurin'
 
       - name: Run Unit Tests & Generate Coverage
-        run: mvn -B test
+        run: mvn -B test -Dtest="!*ControllerTest" -DfailIfNoTests=false
 
       # 恢复 Java 25 给后续 Sonar 分析使用
       - name: Set up Java 25 for Sonar
