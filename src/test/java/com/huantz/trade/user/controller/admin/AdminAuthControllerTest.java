@@ -25,12 +25,7 @@ class AdminAuthControllerTest extends BaseControllerIntegrationTest {
     AdminLoginRequest request =
         new AdminLoginRequest("nonexistent@example.com", "wrongpassword", null, null);
 
-    givenAnonymous()
-        .body(request)
-        .when()
-        .post("/admin/auth/login")
-        .then()
-        .statusCode(400);
+    givenAnonymous().body(request).when().post("/admin/auth/login").then().statusCode(400);
   }
 
   @Test

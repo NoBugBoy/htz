@@ -32,7 +32,7 @@ import org.springframework.web.multipart.MultipartFile;
 public class AccountCommandServiceImpl implements AccountCommandService {
 
   private static final Set<String> ALLOWED_EXTENSIONS = Set.of("jpg", "jpeg", "png", "webp");
-  private static final long MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+  private static final long MAX_FILE_SIZE = 10L * 1024 * 1024; // 10MB
 
   private final AccountRepository accountRepository;
   private final AccountImageRepository accountImageRepository;
