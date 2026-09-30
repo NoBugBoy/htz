@@ -58,14 +58,18 @@ public class DocumentImportPipeline {
     Optional<DocSourceFileEntity> existingOpt =
         docSourceFileRepository.findByWorkSpaceIdAndFileHash(command.workSpaceId(), fileHash);
 
-    String storagePath;
-    String storageUrl;
-    boolean instantUpload = false;
+    record ExistingFile(String storagePath, String storageUrl) {}
+
+    final String storagePath;
+    final String storageUrl;
+    boolean instantUpload;
 
     if (existingOpt.isPresent()) {
-      DocSourceFileEntity existing = existingOpt.get();
-      storagePath = existing.getStoragePath();
-      storageUrl = existing.getStorageUrl();
+      ExistingFile existing = existingOpt
+          .map(e -> new ExistingFile(e.getStoragePath(), e.getStorageUrl()))
+          .orElseThrow();
+      storagePath = existing.storagePath();
+      storageUrl = existing.storageUrl();
       instantUpload = true;
       log.info(
           "【DocumentImportPipeline】命中文件哈希秒传去重: hash={}, storagePath={}",

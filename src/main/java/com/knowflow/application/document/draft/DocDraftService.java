@@ -62,16 +62,15 @@ public class DocDraftService {
       DocDraftDTO draft = objectMapper.readValue(json, DocDraftDTO.class);
 
       // 查询数据库主文档对比最后更新时间
-      Optional<DocumentEntity> docOpt = documentRepository.findById(documentId);
-      boolean newerThanDatabase = true;
-
-      if (docOpt.isPresent()) {
-        DocumentEntity doc = docOpt.get();
-        LocalDateTime dbUpdateTime = doc.getUpdateTime();
-        if (dbUpdateTime != null && draft.savedAt() != null) {
-          newerThanDatabase = draft.savedAt().isAfter(dbUpdateTime);
-        }
-      }
+      boolean newerThanDatabase = documentRepository.findById(documentId)
+          .map(doc -> {
+            LocalDateTime dbUpdateTime = doc.getUpdateTime();
+            if (dbUpdateTime != null && draft.savedAt() != null) {
+              return draft.savedAt().isAfter(dbUpdateTime);
+            }
+            return true;
+          })
+          .orElse(true);
 
       return DocDraftStatusDTO.of(newerThanDatabase, draft);
     } catch (Exception e) {

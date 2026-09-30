@@ -10,6 +10,11 @@ rules:
     message: "检测到使用 ThreadLocal 但未在 finally 中显式调用 .remove()。在线程池复用场景下，这会导致严重的数据串号与内存泄露（OOM）。"
     patterns:
       - pattern: $TL.set(...)
+      - metavariable-type:
+          metavariable: $TL
+          types:
+            - java.lang.ThreadLocal
+            - java.lang.InheritableThreadLocal
       - pattern-not-inside: |
           try { ... } finally { ... $TL.remove(); ... }
     paths:
@@ -47,6 +52,10 @@ rules:
       - pattern-not: final $TYPE $FIELD;
       - pattern-not: static $TYPE $FIELD;
       - pattern-not: private final $TYPE $FIELD;
+      # @Value 由 Spring 在初始化时注入一次，运行期不会变更，实质只读，不属于线程安全风险
+      - pattern-not: |
+          @Value(...)
+          $TYPE $FIELD;
     paths:
       exclude: [ "src/test/**" ]
 

@@ -104,7 +104,8 @@ public class DocAccessControlService {
       return false;
     }
 
-    WorkSpaceMemberEntity member = memberOpt.get();
+    WorkSpaceMemberEntity member = memberOpt.orElseThrow(() ->
+        new BusinessException(ErrorCode.Document.DOC_ACCESS_DENIED, "无权编辑该文档"));
 
     // PRIVATE: 仅文档创建者或团队 OWNER/ADMIN 可编辑
     if (visibility == WorkSpaceAclEnum.PRIVATE) {

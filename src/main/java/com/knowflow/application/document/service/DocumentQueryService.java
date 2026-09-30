@@ -46,7 +46,7 @@ public class DocumentQueryService {
       return Optional.empty();
     }
 
-    DocumentEntity doc = docOpt.get();
+    DocumentEntity doc = docOpt.orElseThrow();
     docAccessControlService.assertCanRead(doc, userId);
 
     // 异步累计阅读量：通过发布领域事件解耦，避免只读查询产生主表行锁争用
