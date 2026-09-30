@@ -28,10 +28,21 @@ trigger: always_on
 - **事务边界控制**：
   - `@Transactional` 仅放在业务编排层（Application/Service），禁止加在 Controller 上。
   - 事务内严禁包含耗时网络 IO（如调用外部第三方 API、发短信、上传文件），遵循“大事务拆小事务、IO 操作移出事务”原则。
+  - **严防 Self-Invocation 代理失效**：严禁在同一个 Spring Bean 内部通过 `this.method()` 调用带 `@Transactional` 的方法（Spring AOP 动态代理会失效，事务形同虚设）。涉及“IO 操作移出事务”的大事务拆小事务场景，必须将具体事务操作提取到独立的 `@Service` 组件中注入调用。
+- **高并发与读写分离解耦**：
+  - 读接口（Query Service / getById 等）严禁混入写事务或行锁写操作（如同步累加阅读量、更新最后访问时间），避免高并发读引发主表行锁争用。
+  - 统计类/审计类写操作必须通过异步领域事件（`ApplicationEventPublisher` + `@Async @EventListener`）或 Redis 批量计数解耦。
 - **并发与锁**：
   - 涉及状态机流转或账户扣减，必须考虑幂等性与并发安全（优先数据库乐观锁 `version` 或分布式锁 Redis/Redisson）。
+  - 计数器递增禁止在应用内存中读-改-写（避免 Lost Update），必须使用 Repository 层原子 SQL（`@Modifying @Query UPDATE ... SET count = count + 1`）或 Redis 原子命令。
 
-## 4. 涉及/重构指导原则：
+## 4. 领域建模与 API 防腐约定
+- **不可变快照保护**：历史版本快照、审计记录等固化实体，必须在 JPA/Hibernate 层面添加 `@Immutable`，数据库层面拒绝 UPDATE。
+- **基础实体封装**：`BaseEntity` 严禁滥用全局 `@Setter`，避免破坏子实体的充血封装性与业务防线。
+- **Controller 纯粹性**：Controller 层仅负责请求参数校验和调用转发，**严禁注入 Mapper 在 Controller 层直接操作 Entity ↔ DTO 转换**（实体转换属于 Service/UseCase 内部职责）；严禁在 Controller 层手动拆包解构 Request。
+- **DTO 安全与脱敏**：对外暴露的 DTO 必须剔除底层基础设施物理路径（如对象存储底层 `storagePath`、内部私网 IP 等），仅暴露安全公开访问链接。
+
+## 5. 涉及/重构指导原则：
 ### 1. 坏味道诊断（Bad Smells）
 - **万能上帝类（God Service）**：动辄上千行的 `XxxServiceImpl`，充斥着各种逻辑。
 - **贫血数据包（Anemic POJO）**：实体只有属性，逻辑全部散落在 Service 中通过 `get/set` 拼凑。

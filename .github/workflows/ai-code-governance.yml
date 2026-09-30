@@ -38,7 +38,7 @@ jobs:
       image: semgrep/semgrep
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Run Semgrep SAST & Standards Scan
         id: semgrep_scan
@@ -66,7 +66,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0 # Sonar 需要完整的 Git 历史来比对责任人和代码变更
 
