@@ -4,7 +4,7 @@ spring:
       on-profile: local
   datasource:
     driver-class-name: org.postgresql.Driver
-    url: jdbc:postgresql://localhost:5432/testdb?currentSchema=public&reWriteBatchedInserts=true
+    url: jdbc:postgresql://localhost:5432/knowflow?currentSchema=public&reWriteBatchedInserts=true
     username: postgres
     password: root
   flyway:
@@ -12,11 +12,10 @@ spring:
     baseline-on-migrate: true
   data:
     redis:
-      url: ${redis-host}
-
+      url: redis://localhost:6379
   jpa:
     hibernate:
-      # 量产阶段使用flyway 关闭 ddl-auto 改为validate
+      # 量产阶段使用 flyway，关闭 ddl-auto 改为 validate
       ddl-auto: update
     show-sql: true
     properties:
@@ -27,7 +26,7 @@ spring:
       enabled: true
   mail:
     host: smtp.qq.com
-    port: 465 # SSL 端口通常为 465，TLS 为 587
+    port: 465
     username: 754369677@qq.com
     password: yjxfnjndtvpqbgad
     protocol: smtps
@@ -37,13 +36,37 @@ spring:
           auth: true
           ssl:
             enable: true
+
 wx:
   miniapp:
-    appid: wx0c0e1b56a66e6e3b      # 你的小程序 AppID
-    secret: 56fe21c4c920712af5eb991cb356695b    # 你的小程序 AppSecret
-    # 自动将 AccessToken 等凭证缓存在 Redis 中 (多实例集群部署必备)
-#    config-storage:
-#      type: redis
-#      redis:
-#        host: 127.0.0.1
-#        port: 6379
+    appid: wx0c0e1b56a66e6e3b
+    secret: 56fe21c4c920712af5eb991cb356695b
+
+# ── 安全 ──────────────────────────────────────────────────────────────────────
+security:
+  token:
+    expire-seconds: 7200
+
+# ── 对象存储 (RustFS / S3 兼容) ───────────────────────────────────────────────
+knowflow:
+  storage:
+    rustfs:
+      enabled: true
+      endpoint: http://localhost:9000
+      bucket-name: knowflow
+      access-key: rustfsadmin
+      secret-key: rustfsadmin
+      region: us-east-1
+
+  # ── 文档解析引擎 ─────────────────────────────────────────────────────────────
+  # 可选值: AUTO | MARKITDOWN | MINERU
+  # AUTO: 根据文件类型自动路由（推荐）
+  parser:
+    default-engine: AUTO
+    # MarkItDown：部署独立 Python 微服务后填写，留空则降级为 Mock 引擎
+    markitdown:
+      endpoint:
+    # MinerU：填写 MinerU 云端 API 或本地服务地址，留空则降级为 Mock 引擎
+    mineru:
+      endpoint:
+      api-key:
