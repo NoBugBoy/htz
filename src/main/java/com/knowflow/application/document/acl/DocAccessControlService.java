@@ -5,9 +5,7 @@ import com.knowflow.application.document.model.entity.DocumentEntity;
 import com.knowflow.application.enums.WorkSpaceAclEnum;
 import com.knowflow.application.enums.WorkSpaceRoleEnum;
 import com.knowflow.application.exception.BusinessException;
-import com.knowflow.application.user.model.entity.WorkSpaceMemberEntity;
-import com.knowflow.application.user.repository.WorkSpaceMemberRepository;
-import java.util.Optional;
+import com.knowflow.application.user.api.WorkSpaceMemberQueryService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -15,13 +13,16 @@ import org.springframework.stereotype.Service;
 /**
  * 文档细粒度 ACL 访问控制断言服务
  * 根据文档公开级别 (PUBLIC / INTERNAL / PRIVATE) 及工作区成员角色实现严格权限拦截
+ * <p>
+ * 依赖 {@link WorkSpaceMemberQueryService} 公开 API 接口访问团队成员信息，
+ * 遵循 Spring Modulith 模块封装规范，禁止跨模块直接访问 Repository。
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class DocAccessControlService {
 
-  private final WorkSpaceMemberRepository workSpaceMemberRepository;
+  private final WorkSpaceMemberQueryService workSpaceMemberQueryService;
 
   /**
    * 断言是否有权读取该文档
@@ -61,12 +62,11 @@ public class DocAccessControlService {
       return true;
     }
 
-    Optional<WorkSpaceMemberEntity> memberOpt =
-        workSpaceMemberRepository.findByWorkSpaceIdAndUserId(doc.getWorkSpaceId(), userId);
+    boolean isMember = workSpaceMemberQueryService.isMember(doc.getWorkSpaceId(), userId);
 
     // 2. INTERNAL: 仅当前团队空间成员可查阅
     if (visibility == WorkSpaceAclEnum.INTERNAL) {
-      return memberOpt.isPresent();
+      return isMember;
     }
 
     // 3. PRIVATE: 仅文档创建者、或者团队 OWNER / ADMIN 可查阅
@@ -74,7 +74,7 @@ public class DocAccessControlService {
       if (userId.equals(doc.getCreateBy())) {
         return true;
       }
-      return memberOpt.filter(m -> m.hasAtLeastRole(WorkSpaceRoleEnum.ADMIN)).isPresent();
+      return workSpaceMemberQueryService.hasRole(doc.getWorkSpaceId(), userId, WorkSpaceRoleEnum.ADMIN);
     }
 
     return false;
@@ -96,27 +96,21 @@ public class DocAccessControlService {
       visibility = WorkSpaceAclEnum.INTERNAL;
     }
 
-    Optional<WorkSpaceMemberEntity> memberOpt =
-        workSpaceMemberRepository.findByWorkSpaceIdAndUserId(doc.getWorkSpaceId(), userId);
-
     // 如果用户非本工作空间成员，不可编辑
-    if (memberOpt.isEmpty()) {
+    if (!workSpaceMemberQueryService.isMember(doc.getWorkSpaceId(), userId)) {
       return false;
     }
-
-    WorkSpaceMemberEntity member = memberOpt.orElseThrow(() ->
-        new BusinessException(ErrorCode.Document.DOC_ACCESS_DENIED, "无权编辑该文档"));
 
     // PRIVATE: 仅文档创建者或团队 OWNER/ADMIN 可编辑
     if (visibility == WorkSpaceAclEnum.PRIVATE) {
       if (userId.equals(doc.getCreateBy())) {
         return true;
       }
-      return member.hasAtLeastRole(WorkSpaceRoleEnum.ADMIN);
+      return workSpaceMemberQueryService.hasRole(doc.getWorkSpaceId(), userId, WorkSpaceRoleEnum.ADMIN);
     }
 
-    // PUBLIC / INTERNAL: 需要是工作区普通成员或以上（不能是只读受限角色）
-    return member.hasAtLeastRole(WorkSpaceRoleEnum.MEMBER);
+    // PUBLIC / INTERNAL: 需要是工作区普通成员或以上
+    return workSpaceMemberQueryService.hasRole(doc.getWorkSpaceId(), userId, WorkSpaceRoleEnum.MEMBER);
   }
 
   /**
@@ -126,9 +120,8 @@ public class DocAccessControlService {
     if (workSpaceId == null || userId == null) {
       return WorkSpaceRoleEnum.MEMBER.name();
     }
-    return workSpaceMemberRepository
-        .findByWorkSpaceIdAndUserId(workSpaceId, userId)
-        .map(m -> m.getRole().name())
+    return workSpaceMemberQueryService.getMember(workSpaceId, userId)
+        .map(m -> m.role().name())
         .orElse(WorkSpaceRoleEnum.MEMBER.name());
   }
 
@@ -139,8 +132,7 @@ public class DocAccessControlService {
     if (workSpaceId == null || userId == null) {
       throw new BusinessException(ErrorCode.Document.DOC_ACCESS_DENIED, "无权访问此工作区文档");
     }
-    boolean isMember = workSpaceMemberRepository.findByWorkSpaceIdAndUserId(workSpaceId, userId).isPresent();
-    if (!isMember) {
+    if (!workSpaceMemberQueryService.isMember(workSpaceId, userId)) {
       throw new BusinessException(ErrorCode.Document.DOC_ACCESS_DENIED, "您不是该工作空间成员，无权查看文档列表");
     }
   }

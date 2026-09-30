@@ -14,6 +14,7 @@ import cn.binarywang.wx.miniapp.api.WxMaUserService;
 import cn.binarywang.wx.miniapp.bean.WxMaJscode2SessionResult;
 import cn.binarywang.wx.miniapp.bean.WxMaPhoneNumberInfo;
 import com.knowflow.application.common.CustomerProperties;
+import com.knowflow.application.common.security.RedisTokenManager;
 import com.knowflow.application.exception.BusinessException;
 import com.knowflow.application.user.api.UserQueryService;
 import com.knowflow.application.user.model.entity.UserEntity;
@@ -22,6 +23,7 @@ import com.knowflow.application.user.usecase.LoginUseCase;
 import com.knowflow.application.user.usecase.LoginUseCase.LoginCommand;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
+import java.util.Collections;
 import java.util.Optional;
 import me.chanjar.weixin.common.error.WxError;
 import me.chanjar.weixin.common.error.WxErrorException;
@@ -50,6 +52,8 @@ class LoginUseCaseTest {
 
   @Mock private CustomerProperties.Security security;
 
+  @Mock private RedisTokenManager redisTokenManager;
+
   @InjectMocks private LoginUseCase loginUseCase;
 
   @BeforeEach
@@ -58,6 +62,7 @@ class LoginUseCaseTest {
     lenient().when(wxMaService.getUserService()).thenReturn(wxMaUserService);
     lenient().when(customerProperties.security()).thenReturn(security);
     lenient().when(security.getPrivateKey()).thenReturn(KEY_PAIR.getPrivate());
+    lenient().when(redisTokenManager.generateToken(any(), any())).thenReturn("mock-token-uuid");
   }
 
   @Test

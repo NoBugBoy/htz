@@ -9,8 +9,9 @@ import com.knowflow.application.document.statemachine.DocumentStateEnum;
 import com.knowflow.application.enums.WorkSpaceAclEnum;
 import com.knowflow.application.enums.WorkSpaceRoleEnum;
 import com.knowflow.application.exception.BusinessException;
-import com.knowflow.application.user.model.entity.WorkSpaceMemberEntity;
-import com.knowflow.application.user.repository.WorkSpaceMemberRepository;
+import com.knowflow.application.user.api.WorkSpaceMemberQueryService;
+import com.knowflow.application.user.api.dto.WorkSpaceMemberDTO;
+import java.time.LocalDateTime;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -23,13 +24,13 @@ import org.springframework.test.util.ReflectionTestUtils;
 @ExtendWith(MockitoExtension.class)
 class DocAccessControlServiceTest {
 
-  @Mock private WorkSpaceMemberRepository workSpaceMemberRepository;
+  @Mock private WorkSpaceMemberQueryService workSpaceMemberQueryService;
 
   private DocAccessControlService aclService;
 
   @BeforeEach
   void setUp() {
-    aclService = new DocAccessControlService(workSpaceMemberRepository);
+    aclService = new DocAccessControlService(workSpaceMemberQueryService);
   }
 
   @Test
@@ -47,9 +48,11 @@ class DocAccessControlServiceTest {
     DocumentEntity doc = DocumentEntity.createManual(1L, 0L, "内部文档", "摘要", "内容", WorkSpaceAclEnum.INTERNAL);
     ReflectionTestUtils.setField(doc, "id", 11L);
 
-    WorkSpaceMemberEntity member = WorkSpaceMemberEntity.create(1L, 100L, WorkSpaceRoleEnum.MEMBER);
-    when(workSpaceMemberRepository.findByWorkSpaceIdAndUserId(1L, 100L)).thenReturn(Optional.of(member));
-    when(workSpaceMemberRepository.findByWorkSpaceIdAndUserId(1L, 999L)).thenReturn(Optional.empty());
+    // 成员 100: isMember=true, hasRole(MEMBER)=true
+    when(workSpaceMemberQueryService.isMember(1L, 100L)).thenReturn(true);
+    when(workSpaceMemberQueryService.hasRole(1L, 100L, WorkSpaceRoleEnum.MEMBER)).thenReturn(true);
+    // 非成员 999: isMember=false
+    when(workSpaceMemberQueryService.isMember(1L, 999L)).thenReturn(false);
 
     assertThat(aclService.canRead(doc, 100L)).isTrue();
     assertThat(aclService.canWrite(doc, 100L)).isTrue();
@@ -67,21 +70,21 @@ class DocAccessControlServiceTest {
     ReflectionTestUtils.setField(doc, "id", 12L);
     ReflectionTestUtils.setField(doc, "createBy", 200L);
 
-    // 1. 创建者本人 -> 允许
+    // 1. 创建者本人(200) -> canRead 因 userId.equals(createBy) 直接返回 true，不查成员
     assertThat(aclService.canRead(doc, 200L)).isTrue();
-    WorkSpaceMemberEntity creatorMember = WorkSpaceMemberEntity.create(1L, 200L, WorkSpaceRoleEnum.MEMBER);
-    when(workSpaceMemberRepository.findByWorkSpaceIdAndUserId(1L, 200L)).thenReturn(Optional.of(creatorMember));
+    // canWrite: 先 isMember，再因 userId==createBy 返回 true
+    when(workSpaceMemberQueryService.isMember(1L, 200L)).thenReturn(true);
     assertThat(aclService.canWrite(doc, 200L)).isTrue();
 
-    // 2. 普通成员（非创建者） -> 拒绝
-    WorkSpaceMemberEntity normalMember = WorkSpaceMemberEntity.create(1L, 300L, WorkSpaceRoleEnum.MEMBER);
-    when(workSpaceMemberRepository.findByWorkSpaceIdAndUserId(1L, 300L)).thenReturn(Optional.of(normalMember));
+    // 2. 普通成员(非创建者 300) -> 拒绝
+    when(workSpaceMemberQueryService.isMember(1L, 300L)).thenReturn(true);
+    when(workSpaceMemberQueryService.hasRole(1L, 300L, WorkSpaceRoleEnum.ADMIN)).thenReturn(false);
     assertThat(aclService.canRead(doc, 300L)).isFalse();
     assertThat(aclService.canWrite(doc, 300L)).isFalse();
 
-    // 3. 管理员 -> 允许
-    WorkSpaceMemberEntity adminMember = WorkSpaceMemberEntity.create(1L, 400L, WorkSpaceRoleEnum.ADMIN);
-    when(workSpaceMemberRepository.findByWorkSpaceIdAndUserId(1L, 400L)).thenReturn(Optional.of(adminMember));
+    // 3. 管理员(400) -> 允许
+    when(workSpaceMemberQueryService.isMember(1L, 400L)).thenReturn(true);
+    when(workSpaceMemberQueryService.hasRole(1L, 400L, WorkSpaceRoleEnum.ADMIN)).thenReturn(true);
     assertThat(aclService.canRead(doc, 400L)).isTrue();
     assertThat(aclService.canWrite(doc, 400L)).isTrue();
   }
