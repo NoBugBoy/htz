@@ -2,9 +2,7 @@ package com.knowflow.application.document.model.enums;
 
 import lombok.Getter;
 
-/**
- * 文档内容来源渠道
- */
+/** 文档内容来源渠道 */
 @Getter
 public enum DocSourceTypeEnum {
 

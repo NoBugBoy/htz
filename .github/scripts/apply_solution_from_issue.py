@@ -165,7 +165,6 @@ def parse_approved_indices(comment_body, total):
 def main():
     issue_number = os.environ["ISSUE_NUMBER"]
     issue_body   = os.environ.get("ISSUE_BODY", "")
-    issue_title  = os.environ.get("ISSUE_TITLE", "")
     comment_body = os.environ.get("COMMENT_BODY", "")
     repo         = os.environ["GITHUB_REPOSITORY"]
     token        = os.environ["GITHUB_TOKEN"]
@@ -178,7 +177,7 @@ def main():
     try:
         # ── Step 1：从 Issue body 提取 SonarCloud 原始数据 ────────────────────
         print(f"📦 Issue #{issue_number} | 评论：{comment_body[:80]}")
-        data_match = re.search(r'<!-- SONAR_ISSUE_DATA\s*([\s\S]+?)\s*-->', issue_body)
+        data_match = re.search(r'<!-- SONAR_ISSUE_DATA\s*([\s\S]+?)-->', issue_body)
         if not data_match:
             raise ValueError("未在 Issue 中找到 SONAR_ISSUE_DATA 数据块，请确认此 Issue 由 SonarCloud 流水线生成。")
 
@@ -193,7 +192,7 @@ def main():
         approved_indices = parse_approved_indices(comment_body, total)
         if not approved_indices:
             raise ValueError(
-                f"未能从评论中解析出有效的修复指令。\n"
+                "未能从评论中解析出有效的修复指令。\n"
                 f"支持格式：`同意修复 1,3,5` / `执行全部` / `跳过 2,4`"
             )
         valid_indices  = {i for i in approved_indices if 1 <= i <= total}
@@ -268,7 +267,7 @@ def main():
             response_format={"type": "json_object"}
         )
         decision = json.loads(resp.choices[0].message.content)
-        print(f"🤖 AI 决策完成")
+        print("🤖 AI 决策完成")
 
         for skip in decision.get("skip_list", []):
             print(f"⏭️ 跳过 {skip.get('file_path')}: {skip.get('reason')}")

@@ -115,7 +115,7 @@ def main():
     # 打印忽略项
     ignore_list = decision.get("ignore_list", [])
     if ignore_list:
-        print(f"🔕 AI 判定为误报/忽略的问题：")
+        print("🔕 AI 判定为误报/忽略的问题：")
         for reason in ignore_list:
             print(f"  - {reason}")
 

@@ -1,6 +1,5 @@
 package com.knowflow.application.document.pipeline;
 
-import cn.hutool.core.util.StrUtil;
 import com.knowflow.application.common.ErrorCode;
 import com.knowflow.application.document.model.entity.DocSourceFileEntity;
 import com.knowflow.application.document.model.entity.DocumentEntity;
@@ -69,8 +68,11 @@ public class DocumentImportTransactionalService {
           parseResult.errorMessage());
     }
 
-    String fallbackTitle = StrUtil.subBefore(command.originalFileName(), ".", true);
-    String docTitle = StrUtil.blankToDefault(parseResult.suggestedTitle(), fallbackTitle);
+    String fallbackTitle =
+        cn.hutool.core.text.CharSequenceUtil.subBefore(command.originalFileName(), ".", true);
+    String docTitle =
+        cn.hutool.core.text.CharSequenceUtil.blankToDefault(
+            parseResult.suggestedTitle(), fallbackTitle);
 
     if (parseResult.isPreviewOnly()) {
       // 固化版面类 (PDF 默认双轨制 - 仅预览模式)
@@ -114,7 +116,8 @@ public class DocumentImportTransactionalService {
           parseResult.metadata());
     } else {
       // 纯文本类 (Markdown/TXT) 与办公文档类 (Word/DOCX) -> 100% 自由编辑
-      String markdownContent = StrUtil.blankToDefault(parseResult.markdownContent(), "");
+      String markdownContent =
+          cn.hutool.core.text.CharSequenceUtil.blankToDefault(parseResult.markdownContent(), "");
       String summary = "导入自外部文件: " + command.originalFileName();
 
       DocumentEntity doc =
@@ -156,9 +159,11 @@ public class DocumentImportTransactionalService {
   @Transactional
   public DocumentEntity saveExtractedPdfDocument(
       DocSourceFileEntity sourceFile, Long targetCategoryId, DocParseResult extractResult) {
-    String baseTitle = StrUtil.subBefore(sourceFile.getOriginalFileName(), ".", true);
+    String baseTitle =
+        cn.hutool.core.text.CharSequenceUtil.subBefore(sourceFile.getOriginalFileName(), ".", true);
     String docTitle =
-        StrUtil.blankToDefault(extractResult.suggestedTitle(), baseTitle + " (提炼在线版)");
+        cn.hutool.core.text.CharSequenceUtil.blankToDefault(
+            extractResult.suggestedTitle(), baseTitle + " (提炼在线版)");
 
     DocumentEntity doc =
         DocumentEntity.createFromImport(

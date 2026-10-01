@@ -2,9 +2,7 @@ package com.knowflow.application.document.parser;
 
 import lombok.Getter;
 
-/**
- * 文档解析引擎类型枚举
- */
+/** 文档解析引擎类型枚举 */
 @Getter
 public enum DocParserEngineEnum {
 

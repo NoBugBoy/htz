@@ -22,7 +22,6 @@ import com.knowflow.application.document.parser.DocParserGateway;
 import com.knowflow.application.document.repository.DocSourceFileRepository;
 import com.knowflow.application.document.repository.DocumentRepository;
 import com.knowflow.application.document.statemachine.DocumentStateEnum;
-import com.knowflow.application.enums.WorkSpaceAclEnum;
 import com.knowflow.application.exception.BusinessException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -124,7 +123,9 @@ class DocumentImportPipelineTest {
     assertThat(result.instantUpload()).isFalse();
     assertThat(result.parseStatus()).isEqualTo(DocParseStatusEnum.SUCCESS);
 
-    verify(fileStorageGateway).upload(anyString(), any(InputStream.class), eq("text/markdown"), eq((long) mdBytes.length));
+    verify(fileStorageGateway)
+        .upload(
+            anyString(), any(InputStream.class), eq("text/markdown"), eq((long) mdBytes.length));
   }
 
   @Test
@@ -133,7 +134,12 @@ class DocumentImportPipelineTest {
     // Arrange
     byte[] docxBytes = "dummy docx binary content".getBytes(StandardCharsets.UTF_8);
     DocumentImportCommand command =
-        DocumentImportCommand.ofBytes(1L, 20L, "项目规范.docx", docxBytes, "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+        DocumentImportCommand.ofBytes(
+            1L,
+            20L,
+            "项目规范.docx",
+            docxBytes,
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
 
     when(docSourceFileRepository.findByWorkSpaceIdAndFileHash(eq(1L), anyString()))
         .thenReturn(Optional.empty());
@@ -340,7 +346,8 @@ class DocumentImportPipelineTest {
     // Assert
     assertThat(result.instantUpload()).isTrue();
     assertThat(result.storagePath()).isEqualTo("workspaces/1/docs/old.txt");
-    verify(fileStorageGateway, never()).upload(anyString(), any(InputStream.class), anyString(), anyLong());
+    verify(fileStorageGateway, never())
+        .upload(anyString(), any(InputStream.class), anyString(), anyLong());
   }
 
   @Test
@@ -349,7 +356,15 @@ class DocumentImportPipelineTest {
     // Arrange
     DocSourceFileEntity pdfSource =
         DocSourceFileEntity.create(
-            1L, null, "技术白皮书.pdf", 2048L, "pdf", "application/pdf", "pdfhash", "workspaces/1/docs/whitepaper.pdf", "http://rustfs/whitepaper.pdf");
+            1L,
+            null,
+            "技术白皮书.pdf",
+            2048L,
+            "pdf",
+            "application/pdf",
+            "pdfhash",
+            "workspaces/1/docs/whitepaper.pdf",
+            "http://rustfs/whitepaper.pdf");
     ReflectionTestUtils.setField(pdfSource, "id", 500L);
 
     when(docSourceFileRepository.findById(500L)).thenReturn(Optional.of(pdfSource));
@@ -358,7 +373,11 @@ class DocumentImportPipelineTest {
     when(docParserGateway.parse(any(DocParseCommand.class)))
         .thenReturn(
             DocParseResult.success(
-                extractedContent, extractedContent, "技术白皮书 (提取在线版)", DocParserEngineEnum.MINERU, Map.of()));
+                extractedContent,
+                extractedContent,
+                "技术白皮书 (提取在线版)",
+                DocParserEngineEnum.MINERU,
+                Map.of()));
 
     when(documentRepository.save(any(DocumentEntity.class)))
         .thenAnswer(
@@ -426,7 +445,15 @@ class DocumentImportPipelineTest {
             inv -> {
               DocSourceFileEntity entity =
                   DocSourceFileEntity.create(
-                      1L, null, "corrupt.docx", (long) content.length, "docx", "application/docx", "hash", "path", "url");
+                      1L,
+                      null,
+                      "corrupt.docx",
+                      (long) content.length,
+                      "docx",
+                      "application/docx",
+                      "hash",
+                      "path",
+                      "url");
               ReflectionTestUtils.setField(entity, "id", 777L);
               return Optional.of(entity);
             });

@@ -1,6 +1,5 @@
 package com.knowflow.application.document.model.entity;
 
-import cn.hutool.core.util.StrUtil;
 import com.knowflow.application.common.BaseEntity;
 import com.knowflow.application.document.model.enums.DocSourceTypeEnum;
 import com.knowflow.application.document.statemachine.DocumentStateEnum;
@@ -17,10 +16,7 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-/**
- * 文档聚合根 (Document Aggregate Root)
- * 知识库内容资产的核心实体，自闭合管理生命周期、版本流转与内容快照
- */
+/** 文档聚合根 (Document Aggregate Root) 知识库内容资产的核心实体，自闭合管理生命周期、版本流转与内容快照 */
 @Entity
 @Table(
     name = "kf_document",
@@ -98,9 +94,7 @@ public class DocumentEntity extends BaseEntity {
   @Column(name = "like_count", nullable = false)
   private Integer likeCount;
 
-  /**
-   * 静态工厂：创建手写在线 Markdown 文档
-   */
+  /** 静态工厂：创建手写在线 Markdown 文档 */
   public static DocumentEntity createManual(
       Long workSpaceId,
       Long categoryId,
@@ -119,9 +113,7 @@ public class DocumentEntity extends BaseEntity {
         null);
   }
 
-  /**
-   * 静态工厂：从外部文件导入转化创建文档
-   */
+  /** 静态工厂：从外部文件导入转化创建文档 */
   public static DocumentEntity createFromImport(
       Long workSpaceId,
       Long categoryId,
@@ -141,9 +133,7 @@ public class DocumentEntity extends BaseEntity {
         sourceFileId);
   }
 
-  /**
-   * 静态工厂：由 AI 辅助生成创建文档
-   */
+  /** 静态工厂：由 AI 辅助生成创建文档 */
   public static DocumentEntity createFromAi(
       Long workSpaceId,
       Long categoryId,
@@ -191,77 +181,65 @@ public class DocumentEntity extends BaseEntity {
     return entity;
   }
 
-  /**
-   * 更新文档基本内容
-   */
-  public void updateContent(String newTitle, String newSummary, String newContent, Integer newWordCount) {
+  /** 更新文档基本内容 */
+  public void updateContent(
+      String newTitle, String newSummary, String newContent, Integer newWordCount) {
     assertCanEdit();
-    if (StrUtil.isNotBlank(newTitle)) {
+    if (cn.hutool.core.text.CharSequenceUtil.isNotBlank(newTitle)) {
       this.title = newTitle.trim();
     }
     this.summary = newSummary;
     if (newContent != null) {
       this.content = newContent;
-      this.wordCount = (newWordCount != null && newWordCount >= 0)
-          ? newWordCount
-          : calculateWordCount(newContent);
+      this.wordCount =
+          (newWordCount != null && newWordCount >= 0)
+              ? newWordCount
+              : calculateWordCount(newContent);
     }
   }
 
-  /**
-   * 变更所属分类目录
-   */
+  /** 变更所属分类目录 */
   public void updateCategory(Long newCategoryId) {
     this.categoryId = (newCategoryId == null || newCategoryId < 0) ? 0L : newCategoryId;
   }
 
-  /**
-   * 调整访问权限级别
-   */
+  /** 调整访问权限级别 */
   public void updateVisibility(WorkSpaceAclEnum newVisibility) {
     if (newVisibility != null) {
       this.visibility = newVisibility;
     }
   }
 
-  /**
-   * 设置文档封面
-   */
+  /** 设置文档封面 */
   public void updateCover(String newCoverUrl) {
     this.coverUrl = newCoverUrl;
   }
 
-  /**
-   * 绑定原始文件资产 ID
-   */
+  /** 绑定原始文件资产 ID */
   public void bindSourceFile(Long sourceFileId) {
     this.sourceFileId = sourceFileId;
   }
 
-  /**
-   * 变更文档生命周期状态（受状态机驱动）
-   */
+  /** 变更文档生命周期状态（受状态机驱动） */
   public void transitionTo(DocumentStateEnum targetState) {
     Objects.requireNonNull(targetState, "目标状态不能为空");
     this.status = targetState;
   }
 
-  /**
-   * 发布新正式版本（固化快照序号）
-   */
+  /** 发布新正式版本（固化快照序号） */
   public int publishNewVersion(String customVersionTag) {
     this.currentVersion = this.currentVersion + 1;
     this.currentVersionTag =
-        StrUtil.isNotBlank(customVersionTag) ? customVersionTag : "v" + this.currentVersion + ".0";
+        cn.hutool.core.text.CharSequenceUtil.isNotBlank(customVersionTag)
+            ? customVersionTag
+            : "v" + this.currentVersion + ".0";
     this.status = DocumentStateEnum.PUBLISHED;
     return this.currentVersion;
   }
 
-  /**
-   * 回滚至指定历史版本正文
-   */
+  /** 回滚至指定历史版本正文 */
   public void rollbackToVersion(Integer versionNumber, String versionTitle, String versionContent) {
-    if (StrUtil.isNotBlank(versionTitle)) {
+    if (cn.hutool.core.text.CharSequenceUtil.isNotBlank(versionTitle)) {
       this.title = versionTitle;
     }
     if (versionContent != null) {
@@ -275,32 +253,24 @@ public class DocumentEntity extends BaseEntity {
     this.status = DocumentStateEnum.DRAFT;
   }
 
-  /**
-   * 累加阅读量
-   */
+  /** 累加阅读量 */
   public void incrementReadCount() {
     this.readCount = this.readCount + 1;
   }
 
-  /**
-   * 累加点赞数
-   */
+  /** 累加点赞数 */
   public void incrementLikeCount() {
     this.likeCount = this.likeCount + 1;
   }
 
-  /**
-   * 减少点赞数（取消点赞）
-   */
+  /** 减少点赞数（取消点赞） */
   public void decrementLikeCount() {
     if (this.likeCount > 0) {
       this.likeCount = this.likeCount - 1;
     }
   }
 
-  /**
-   * 校验文档当前是否可编辑
-   */
+  /** 校验文档当前是否可编辑 */
   public void assertCanEdit() {
     if (this.status == DocumentStateEnum.ARCHIVED) {
       throw BusinessException.badRequest("已归档文档已被封存，无法修改内容");
@@ -310,32 +280,29 @@ public class DocumentEntity extends BaseEntity {
     }
   }
 
-  /**
-   * 校验文档是否已正式发布
-   */
+  /** 校验文档是否已正式发布 */
   public boolean isPublished() {
     return this.status == DocumentStateEnum.PUBLISHED;
   }
 
-  /**
-   * 简易准确的 Markdown 字数统计（剔除常见标记符）
-   */
+  /** 简易准确的 Markdown 字数统计（剔除常见标记符） */
   public static int calculateWordCount(String content) {
-    if (StrUtil.isBlank(content)) {
+    if (cn.hutool.core.text.CharSequenceUtil.isBlank(content)) {
       return 0;
     }
     // 过滤掉 markdown 标题标记、代码块反引号、加粗斜体符号与链接括号
-    String stripped = content
-        .replaceAll("#+\\s*", "")
-        .replaceAll("```[a-zA-Z]*", "")
-        .replaceAll("[`*_~\\[\\]()<>]", "")
-        .replaceAll("\\s+", "");
+    String stripped =
+        content
+            .replaceAll("#+\\s*", "")
+            .replaceAll("```[a-zA-Z]*", "")
+            .replaceAll("[`*_~\\[\\]()<>]", "")
+            .replaceAll("\\s+", "");
     return stripped.length();
   }
 
   private static void validateBaseAttributes(Long workSpaceId, String title) {
     Objects.requireNonNull(workSpaceId, "所属工作区ID不能为空");
-    if (StrUtil.isBlank(title)) {
+    if (cn.hutool.core.text.CharSequenceUtil.isBlank(title)) {
       throw BusinessException.badRequest("文档标题不能为空");
     }
   }

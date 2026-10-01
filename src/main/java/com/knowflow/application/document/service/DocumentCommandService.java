@@ -1,7 +1,6 @@
 package com.knowflow.application.document.service;
 
 import cn.hutool.core.io.IoUtil;
-import cn.hutool.core.util.StrUtil;
 import com.knowflow.application.common.ErrorCode;
 import com.knowflow.application.document.acl.DocAccessControlService;
 import com.knowflow.application.document.api.dto.DocumentDTO;
@@ -29,10 +28,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-/**
- * 文档核心命令服务 (CQRS - Command Side)
- * 聚合文档创建、修改、删除、导入、状态机驱动流转
- */
+/** 文档核心命令服务 (CQRS - Command Side) 聚合文档创建、修改、删除、导入、状态机驱动流转 */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -45,9 +41,7 @@ public class DocumentCommandService {
   private final DocumentMapper documentMapper;
   private final ApplicationEventPublisher eventPublisher;
 
-  /**
-   * 手动在线创建 Markdown 文档
-   */
+  /** 手动在线创建 Markdown 文档 */
   @Transactional
   public Long create(DocumentCreateRequest request, Long userId) {
     DocumentEntity doc =
@@ -60,19 +54,24 @@ public class DocumentCommandService {
             request.visibility());
 
     DocumentEntity saved = documentRepository.save(doc);
-    log.info("【DocumentCommandService】文档创建成功: id={}, title={}, userId={}", saved.getId(), saved.getTitle(), userId);
+    log.info(
+        "【DocumentCommandService】文档创建成功: id={}, title={}, userId={}",
+        saved.getId(),
+        saved.getTitle(),
+        userId);
     return saved.getId();
   }
 
-  /**
-   * 修改编辑文档内容
-   */
+  private static final String DOC_NOT_FOUND_MSG = "文档不存在";
+
+  /** 修改编辑文档内容 */
   @Transactional
   public DocumentDTO update(Long docId, DocumentUpdateRequest request, Long userId) {
     DocumentEntity doc =
         documentRepository
             .findById(docId)
-            .orElseThrow(() -> new BusinessException(ErrorCode.Document.DOC_NOT_FOUND, "文档不存在"));
+            .orElseThrow(
+                () -> new BusinessException(ErrorCode.Document.DOC_NOT_FOUND, DOC_NOT_FOUND_MSG));
 
     docAccessControlService.assertCanWrite(doc, userId);
 
@@ -83,7 +82,7 @@ public class DocumentCommandService {
     if (request.visibility() != null) {
       doc.updateVisibility(request.visibility());
     }
-    if (StrUtil.isNotBlank(request.coverUrl())) {
+    if (cn.hutool.core.text.CharSequenceUtil.isNotBlank(request.coverUrl())) {
       doc.updateCover(request.coverUrl());
     }
 
@@ -92,15 +91,14 @@ public class DocumentCommandService {
     return documentMapper.toDTO(updated);
   }
 
-  /**
-   * 软删除文档
-   */
+  /** 软删除文档 */
   @Transactional
   public void delete(Long docId, Long userId) {
     DocumentEntity doc =
         documentRepository
             .findById(docId)
-            .orElseThrow(() -> new BusinessException(ErrorCode.Document.DOC_NOT_FOUND, "文档不存在"));
+            .orElseThrow(
+                () -> new BusinessException(ErrorCode.Document.DOC_NOT_FOUND, DOC_NOT_FOUND_MSG));
 
     docAccessControlService.assertCanWrite(doc, userId);
     Long workSpaceId = doc.getWorkSpaceId();
@@ -109,15 +107,14 @@ public class DocumentCommandService {
     log.info("【DocumentCommandService】文档已删除: id={}, userId={}", docId, userId);
   }
 
-  /**
-   * 文档生命周期流转 (基于 COLA StateMachine 驱动 Condition 规则校验与 Action 副作用执行)
-   */
+  /** 文档生命周期流转 (基于 COLA StateMachine 驱动 Condition 规则校验与 Action 副作用执行) */
   @Transactional
   public DocumentDTO transitionState(Long docId, DocumentTransitionRequest request, Long userId) {
     DocumentEntity doc =
         documentRepository
             .findById(docId)
-            .orElseThrow(() -> new BusinessException(ErrorCode.Document.DOC_NOT_FOUND, "文档不存在"));
+            .orElseThrow(
+                () -> new BusinessException(ErrorCode.Document.DOC_NOT_FOUND, DOC_NOT_FOUND_MSG));
 
     docAccessControlService.assertCanWrite(doc, userId);
 
@@ -129,7 +126,7 @@ public class DocumentCommandService {
             doc,
             userId,
             operatorRole,
-            StrUtil.blankToDefault(request.reason(), "操作审批"));
+            cn.hutool.core.text.CharSequenceUtil.blankToDefault(request.reason(), "操作审批"));
 
     // 触发状态机：执行 Condition 规则检查，并执行对应的 Action（如发布快照生成、Redis 草稿清理等）
     DocumentStateEnum nextState =
@@ -147,9 +144,7 @@ public class DocumentCommandService {
     return documentMapper.toDTO(updated);
   }
 
-  /**
-   * 多源文件上传导入 (委托给 DocumentImportPipeline 执行先入库后解析)
-   */
+  /** 多源文件上传导入 (委托给 DocumentImportPipeline 执行先入库后解析) */
   public DocumentImportResult importFile(
       Long workSpaceId,
       Long categoryId,
@@ -185,12 +180,11 @@ public class DocumentCommandService {
     return importPipeline.importFile(cmd);
   }
 
-  /**
-   * PDF 一键提炼在线文档
-   */
+  /** PDF 一键提炼在线文档 */
   @Transactional
   public DocumentDTO extractPdfToDocument(Long sourceFileId, Long targetCategoryId, Long userId) {
-    DocumentEntity extractedDoc = importPipeline.extractPdfToDocument(sourceFileId, targetCategoryId, userId);
+    DocumentEntity extractedDoc =
+        importPipeline.extractPdfToDocument(sourceFileId, targetCategoryId, userId);
     return documentMapper.toDTO(extractedDoc);
   }
 }

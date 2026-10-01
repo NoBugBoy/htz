@@ -1,6 +1,6 @@
 package com.knowflow.application.document.model.entity;
 
-import cn.hutool.core.util.StrUtil;
+import cn.hutool.core.text.CharSequenceUtil;
 import com.knowflow.application.common.BaseEntity;
 import com.knowflow.application.exception.BusinessException;
 import jakarta.persistence.Column;
@@ -12,9 +12,7 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-/**
- * 文档协同评论实体 (支持楼中楼嵌套回复)
- */
+/** 文档协同评论实体 (支持楼中楼嵌套回复) */
 @Entity
 @Table(
     name = "kf_doc_comment",
@@ -56,9 +54,7 @@ public class DocCommentEntity extends BaseEntity {
   @Column(name = "like_count", nullable = false)
   private Integer likeCount;
 
-  /**
-   * 静态工厂：创建根评论
-   */
+  /** 静态工厂：创建根评论 */
   public static DocCommentEntity createRoot(
       Long workSpaceId, Long documentId, Long userId, String content) {
     validate(workSpaceId, documentId, userId, content);
@@ -74,11 +70,14 @@ public class DocCommentEntity extends BaseEntity {
     return entity;
   }
 
-  /**
-   * 静态工厂：创建楼中楼回复
-   */
+  /** 静态工厂：创建楼中楼回复 */
   public static DocCommentEntity createReply(
-      Long workSpaceId, Long documentId, Long userId, Long parentId, Long replyToUserId, String content) {
+      Long workSpaceId,
+      Long documentId,
+      Long userId,
+      Long parentId,
+      Long replyToUserId,
+      String content) {
     validate(workSpaceId, documentId, userId, content);
     Objects.requireNonNull(parentId, "父评论ID不能为空");
 
@@ -101,7 +100,7 @@ public class DocCommentEntity extends BaseEntity {
     Objects.requireNonNull(workSpaceId, "工作区ID不能为空");
     Objects.requireNonNull(documentId, "文档ID不能为空");
     Objects.requireNonNull(userId, "用户ID不能为空");
-    if (StrUtil.isBlank(content)) {
+    if (CharSequenceUtil.isBlank(content)) {
       throw BusinessException.badRequest("评论内容不能为空");
     }
   }

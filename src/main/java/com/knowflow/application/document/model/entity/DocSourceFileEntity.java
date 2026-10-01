@@ -1,6 +1,5 @@
 package com.knowflow.application.document.model.entity;
 
-import cn.hutool.core.util.StrUtil;
 import com.knowflow.application.common.BaseEntity;
 import com.knowflow.application.document.parser.DocParseStatusEnum;
 import com.knowflow.application.document.parser.DocParserEngineEnum;
@@ -17,9 +16,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 /**
- * 来源原始文件资产实体
- * 记录上传到 rustfs 的原始文件（Word/PDF/附件等）元数据与哈希索引，
- * 支撑后续 Elasticsearch 全文检索与 RAG 向量双路召回时追溯并调出原始文件。
+ * 来源原始文件资产实体 记录上传到 rustfs 的原始文件（Word/PDF/附件等）元数据与哈希索引， 支撑后续 Elasticsearch 全文检索与 RAG
+ * 向量双路召回时追溯并调出原始文件。
  */
 @Entity
 @Table(
@@ -88,9 +86,7 @@ public class DocSourceFileEntity extends BaseEntity {
   @Column(name = "error_message", length = 1000)
   private String errorMessage;
 
-  /**
-   * 静态工厂：创建原始文件记录
-   */
+  /** 静态工厂：创建原始文件记录 */
   public static DocSourceFileEntity create(
       Long workSpaceId,
       Long documentId,
@@ -102,13 +98,13 @@ public class DocSourceFileEntity extends BaseEntity {
       String storagePath,
       String storageUrl) {
     Objects.requireNonNull(workSpaceId, "工作区ID不能为空");
-    if (StrUtil.isBlank(originalFileName)) {
+    if (cn.hutool.core.text.CharSequenceUtil.isBlank(originalFileName)) {
       throw BusinessException.badRequest("原始文件名不能为空");
     }
-    if (StrUtil.isBlank(fileHash)) {
+    if (cn.hutool.core.text.CharSequenceUtil.isBlank(fileHash)) {
       throw BusinessException.badRequest("文件哈希不能为空");
     }
-    if (StrUtil.isBlank(storagePath)) {
+    if (cn.hutool.core.text.CharSequenceUtil.isBlank(storagePath)) {
       throw BusinessException.badRequest("存储路径不能为空");
     }
 
@@ -117,7 +113,10 @@ public class DocSourceFileEntity extends BaseEntity {
     entity.documentId = documentId;
     entity.originalFileName = originalFileName.trim();
     entity.fileSize = (fileSize == null || fileSize < 0) ? 0L : fileSize;
-    entity.fileExt = StrUtil.blankToDefault(fileExt, "").toLowerCase().replace(".", "");
+    entity.fileExt =
+        cn.hutool.core.text.CharSequenceUtil.blankToDefault(fileExt, "")
+            .toLowerCase()
+            .replace(".", "");
     entity.mimeType = mimeType;
     entity.fileHash = fileHash.trim();
     entity.storagePath = storagePath.trim();
@@ -129,40 +128,34 @@ public class DocSourceFileEntity extends BaseEntity {
     return entity;
   }
 
-  /**
-   * 关联主文档
-   */
+  /** 关联主文档 */
   public void bindDocument(Long documentId) {
     Objects.requireNonNull(documentId, "文档ID不能为空");
     this.documentId = documentId;
   }
 
-  /**
-   * 标记解析成功
-   */
+  /** 标记解析成功 */
   public void markParseSuccess(String rawText, DocParserEngineEnum engine) {
     applyParseResult(DocParseStatusEnum.SUCCESS, rawText, engine);
   }
 
-  /**
-   * 标记为固化版面仅预览（如 PDF 双轨制）
-   */
+  /** 标记为固化版面仅预览（如 PDF 双轨制） */
   public void markPreviewOnly(String rawText, DocParserEngineEnum engine) {
     applyParseResult(DocParseStatusEnum.PREVIEW_ONLY, rawText, engine);
   }
 
-  /**
-   * 标记解析失败
-   */
+  /** 标记解析失败 */
   public void markParseFailed(String errorMessage) {
-    if (this.parseStatus == DocParseStatusEnum.SUCCESS || this.parseStatus == DocParseStatusEnum.PREVIEW_ONLY) {
+    if (this.parseStatus == DocParseStatusEnum.SUCCESS
+        || this.parseStatus == DocParseStatusEnum.PREVIEW_ONLY) {
       throw BusinessException.badRequest("文档已成功解析，不可标记为失败状态");
     }
     this.parseStatus = DocParseStatusEnum.FAILED;
     this.errorMessage = errorMessage;
   }
 
-  private void applyParseResult(DocParseStatusEnum newStatus, String rawText, DocParserEngineEnum engine) {
+  private void applyParseResult(
+      DocParseStatusEnum newStatus, String rawText, DocParserEngineEnum engine) {
     this.parseStatus = newStatus;
     this.rawText = rawText;
     if (engine != null) {

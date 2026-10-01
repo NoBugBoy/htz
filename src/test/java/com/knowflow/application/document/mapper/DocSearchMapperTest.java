@@ -72,8 +72,7 @@ class DocSearchMapperTest {
   @DisplayName("无源文件及无 updateTime 时应平滑降级映射")
   void testToSearchDocWithNullSourceFileAndNullUpdateTime() {
     DocumentEntity doc =
-        DocumentEntity.createManual(
-            11L, 0L, "测试无附件文档", null, "纯正文", WorkSpaceAclEnum.PUBLIC);
+        DocumentEntity.createManual(11L, 0L, "测试无附件文档", null, "纯正文", WorkSpaceAclEnum.PUBLIC);
     doc.setId(1002L);
     LocalDateTime createTime = LocalDateTime.of(2026, 10, 1, 9, 30, 0);
     doc.setCreateTime(createTime);

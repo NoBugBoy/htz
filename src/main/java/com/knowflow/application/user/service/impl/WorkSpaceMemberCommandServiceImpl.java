@@ -13,13 +13,12 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * 团队成员写操作服务实现
- */
+/** 团队成员写操作服务实现 */
 @Service
 @RequiredArgsConstructor
 public class WorkSpaceMemberCommandServiceImpl implements WorkSpaceMemberCommandService {
 
+  private static final String NOT_MEMBER_MSG = "您不是该团队成员";
   private final WorkSpaceRepository workSpaceRepository;
   private final WorkSpaceMemberRepository workSpaceMemberRepository;
 
@@ -61,7 +60,7 @@ public class WorkSpaceMemberCommandServiceImpl implements WorkSpaceMemberCommand
     workSpace.assertActive();
 
     // 只有 OWNER 或 ADMIN 可以管理成员角色
-    WorkSpaceMemberEntity operator = findMemberOrThrow(workSpaceId, currentUserId, "您不是该团队成员");
+    WorkSpaceMemberEntity operator = findMemberOrThrow(workSpaceId, currentUserId, NOT_MEMBER_MSG);
     if (!operator.hasAtLeastRole(WorkSpaceRoleEnum.ADMIN)) {
       throw BusinessException.forbidden("仅团队所有者或管理员可修改成员角色");
     }
@@ -89,7 +88,7 @@ public class WorkSpaceMemberCommandServiceImpl implements WorkSpaceMemberCommand
     WorkSpaceEntity workSpace = findWorkSpaceOrThrow(workSpaceId);
     workSpace.assertActive();
 
-    WorkSpaceMemberEntity operator = findMemberOrThrow(workSpaceId, currentUserId, "您不是该团队成员");
+    WorkSpaceMemberEntity operator = findMemberOrThrow(workSpaceId, currentUserId, NOT_MEMBER_MSG);
     if (!operator.hasAtLeastRole(WorkSpaceRoleEnum.ADMIN)) {
       throw BusinessException.forbidden("仅团队所有者或管理员可移除成员");
     }
@@ -111,9 +110,9 @@ public class WorkSpaceMemberCommandServiceImpl implements WorkSpaceMemberCommand
   @Transactional(rollbackFor = Throwable.class)
   public void leaveWorkSpace(Long workSpaceId) {
     Long currentUserId = SecurityHolder.getUserId();
-    WorkSpaceEntity workSpace = findWorkSpaceOrThrow(workSpaceId);
+    findWorkSpaceOrThrow(workSpaceId);
 
-    WorkSpaceMemberEntity member = findMemberOrThrow(workSpaceId, currentUserId, "您不是该团队成员");
+    WorkSpaceMemberEntity member = findMemberOrThrow(workSpaceId, currentUserId, NOT_MEMBER_MSG);
 
     if (member.isOwner()) {
       throw BusinessException.badRequest("团队所有者不能直接退出团队，请先转让所有权或解散团队");

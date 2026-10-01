@@ -1,6 +1,6 @@
 package com.knowflow.application.document.model.entity;
 
-import cn.hutool.core.util.StrUtil;
+import cn.hutool.core.text.CharSequenceUtil;
 import com.knowflow.application.common.BaseEntity;
 import com.knowflow.application.exception.BusinessException;
 import jakarta.persistence.Column;
@@ -12,9 +12,7 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-/**
- * 文档标签实体
- */
+/** 文档标签实体 */
 @Entity
 @Table(
     name = "kf_doc_tag",
@@ -41,22 +39,22 @@ public class DocTagEntity extends BaseEntity {
 
   public static DocTagEntity create(Long workSpaceId, String name, String color) {
     Objects.requireNonNull(workSpaceId, "工作区ID不能为空");
-    if (StrUtil.isBlank(name)) {
+    if (CharSequenceUtil.isBlank(name)) {
       throw BusinessException.badRequest("标签名称不能为空");
     }
 
     DocTagEntity entity = new DocTagEntity();
     entity.workSpaceId = workSpaceId;
     entity.name = name.trim();
-    entity.color = StrUtil.blankToDefault(color, "#1890FF");
+    entity.color = CharSequenceUtil.blankToDefault(color, "#1890FF");
     return entity;
   }
 
   public void update(String name, String color) {
-    if (StrUtil.isNotBlank(name)) {
+    if (CharSequenceUtil.isNotBlank(name)) {
       this.name = name.trim();
     }
-    if (StrUtil.isNotBlank(color)) {
+    if (CharSequenceUtil.isNotBlank(color)) {
       this.color = color.trim();
     }
   }

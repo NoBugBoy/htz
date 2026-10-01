@@ -77,8 +77,7 @@ public class DocumentSearchController {
   }
 
   /**
-   * 删除单条搜索历史记录（支持 QueryParam 传参，避免特殊字符在 PathVariable 中被拦截）
-   * 若未指定 keyword 则执行清空
+   * 删除单条搜索历史记录（支持 QueryParam 传参，避免特殊字符在 PathVariable 中被拦截） 若未指定 keyword 则执行清空
    *
    * @param workspaceId 工作区ID (可选)
    * @param keyword 待删除关键词 (可选)

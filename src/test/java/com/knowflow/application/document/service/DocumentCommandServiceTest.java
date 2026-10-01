@@ -86,12 +86,28 @@ class DocumentCommandServiceTest {
 
     DocumentDTO mockDto =
         new DocumentDTO(
-            100L, 1L, 0L, "新标题", "新摘要", "新内容", DocumentStateEnum.DRAFT, WorkSpaceAclEnum.INTERNAL,
-            DocSourceTypeEnum.MANUAL, null, 0, "v0.1-draft", null, 3, 0, 0, 10L, LocalDateTime.now(), LocalDateTime.now());
+            100L,
+            1L,
+            0L,
+            "新标题",
+            "新摘要",
+            "新内容",
+            DocumentStateEnum.DRAFT,
+            WorkSpaceAclEnum.INTERNAL,
+            DocSourceTypeEnum.MANUAL,
+            null,
+            0,
+            "v0.1-draft",
+            null,
+            3,
+            0,
+            0,
+            10L,
+            LocalDateTime.now(),
+            LocalDateTime.now());
     when(documentMapper.toDTO(any(DocumentEntity.class))).thenReturn(mockDto);
 
-    DocumentUpdateRequest req =
-        new DocumentUpdateRequest("新标题", "新摘要", "新内容", null, null, null);
+    DocumentUpdateRequest req = new DocumentUpdateRequest("新标题", "新摘要", "新内容", null, null, null);
     DocumentDTO result = commandService.update(100L, req, 10L);
 
     assertThat(result.title()).isEqualTo("新标题");
@@ -107,15 +123,35 @@ class DocumentCommandServiceTest {
     ReflectionTestUtils.setField(doc, "id", 100L);
     when(documentRepository.findById(100L)).thenReturn(Optional.of(doc));
 
-    when(stateMachineEngine.fire(eq(DocumentStateEnum.DRAFT), eq(DocumentEventEnum.SUBMIT), any(DocumentStateContext.class)))
+    when(stateMachineEngine.fire(
+            eq(DocumentStateEnum.DRAFT),
+            eq(DocumentEventEnum.SUBMIT),
+            any(DocumentStateContext.class)))
         .thenReturn(DocumentStateEnum.PENDING_REVIEW);
 
     when(documentRepository.save(any(DocumentEntity.class))).thenAnswer(inv -> inv.getArgument(0));
 
     DocumentDTO mockDto =
         new DocumentDTO(
-            100L, 1L, 0L, "文档", "摘要", "内容", DocumentStateEnum.PENDING_REVIEW, WorkSpaceAclEnum.INTERNAL,
-            DocSourceTypeEnum.MANUAL, null, 0, "v0.1-draft", null, 2, 0, 0, 10L, LocalDateTime.now(), LocalDateTime.now());
+            100L,
+            1L,
+            0L,
+            "文档",
+            "摘要",
+            "内容",
+            DocumentStateEnum.PENDING_REVIEW,
+            WorkSpaceAclEnum.INTERNAL,
+            DocSourceTypeEnum.MANUAL,
+            null,
+            0,
+            "v0.1-draft",
+            null,
+            2,
+            0,
+            0,
+            10L,
+            LocalDateTime.now(),
+            LocalDateTime.now());
     when(documentMapper.toDTO(any(DocumentEntity.class))).thenReturn(mockDto);
 
     DocumentTransitionRequest req =
@@ -124,7 +160,11 @@ class DocumentCommandServiceTest {
 
     assertThat(result.status()).isEqualTo(DocumentStateEnum.PENDING_REVIEW);
     verify(docAccessControlService).assertCanWrite(doc, 10L);
-    verify(stateMachineEngine).fire(eq(DocumentStateEnum.DRAFT), eq(DocumentEventEnum.SUBMIT), any(DocumentStateContext.class));
+    verify(stateMachineEngine)
+        .fire(
+            eq(DocumentStateEnum.DRAFT),
+            eq(DocumentEventEnum.SUBMIT),
+            any(DocumentStateContext.class));
   }
 
   @Test
@@ -136,7 +176,10 @@ class DocumentCommandServiceTest {
     doc.transitionTo(DocumentStateEnum.PENDING_REVIEW);
 
     when(documentRepository.findById(100L)).thenReturn(Optional.of(doc));
-    when(stateMachineEngine.fire(eq(DocumentStateEnum.PENDING_REVIEW), eq(DocumentEventEnum.APPROVE), any(DocumentStateContext.class)))
+    when(stateMachineEngine.fire(
+            eq(DocumentStateEnum.PENDING_REVIEW),
+            eq(DocumentEventEnum.APPROVE),
+            any(DocumentStateContext.class)))
         .thenReturn(DocumentStateEnum.PUBLISHED);
 
     when(documentRepository.save(any(DocumentEntity.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -145,7 +188,11 @@ class DocumentCommandServiceTest {
         new DocumentTransitionRequest(DocumentEventEnum.APPROVE, "审批通过准予发布");
     commandService.transitionState(100L, req, 1L);
 
-    verify(stateMachineEngine).fire(eq(DocumentStateEnum.PENDING_REVIEW), eq(DocumentEventEnum.APPROVE), any(DocumentStateContext.class));
+    verify(stateMachineEngine)
+        .fire(
+            eq(DocumentStateEnum.PENDING_REVIEW),
+            eq(DocumentEventEnum.APPROVE),
+            any(DocumentStateContext.class));
     verify(documentRepository).save(doc);
   }
 
@@ -161,6 +208,8 @@ class DocumentCommandServiceTest {
 
     verify(docAccessControlService).assertCanWrite(doc, 10L);
     verify(documentRepository).delete(doc);
-    verify(eventPublisher).publishEvent(any(com.knowflow.application.document.model.event.DocumentDeletedEvent.class));
+    verify(eventPublisher)
+        .publishEvent(
+            any(com.knowflow.application.document.model.event.DocumentDeletedEvent.class));
   }
 }

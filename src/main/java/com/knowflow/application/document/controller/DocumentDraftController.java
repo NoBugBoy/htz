@@ -6,6 +6,7 @@ import com.knowflow.application.document.draft.DocDraftService;
 import com.knowflow.application.document.draft.DocDraftStatusDTO;
 import jakarta.validation.constraints.NotNull;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -16,9 +17,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/**
- * 文档 Redis 协同草稿暂存与自动保存 REST 控制器
- */
+/** 文档 Redis 协同草稿暂存与自动保存 REST 控制器 */
 @RestController
 @RequestMapping("/documents/{docId}/draft")
 @RequiredArgsConstructor
@@ -30,15 +29,11 @@ public class DocumentDraftController {
       @NotNull(message = "工作空间ID不能为空") Long workSpaceId,
       String title,
       String content,
-      Integer cursorPosition
-  ) {}
+      Integer cursorPosition) {}
 
-  /**
-   * 前端高频/防抖自动上报草稿暂存
-   */
+  /** 前端高频/防抖自动上报草稿暂存 */
   @PostMapping
-  public void saveDraft(
-      @PathVariable("docId") Long docId, @RequestBody DraftSaveRequest request) {
+  public void saveDraft(@PathVariable("docId") Long docId, @RequestBody DraftSaveRequest request) {
     Long userId = SecurityHolder.getUserId();
     DocDraftDTO draft =
         new DocDraftDTO(
@@ -48,28 +43,22 @@ public class DocumentDraftController {
             request.title(),
             request.content(),
             request.cursorPosition(),
-            LocalDateTime.now());
+            LocalDateTime.now(ZoneId.systemDefault()));
     docDraftService.saveDraft(draft);
   }
 
-  /**
-   * 进入编辑器时检查是否存在比数据库更新的未保存草稿
-   */
+  /** 进入编辑器时检查是否存在比数据库更新的未保存草稿 */
   @GetMapping
   public DocDraftStatusDTO getDraftStatus(
-      @PathVariable("docId") Long docId,
-      @RequestParam("workSpaceId") Long workSpaceId) {
+      @PathVariable("docId") Long docId, @RequestParam("workSpaceId") Long workSpaceId) {
     Long userId = SecurityHolder.getUserId();
     return docDraftService.getDraftStatus(workSpaceId, docId, userId);
   }
 
-  /**
-   * 主动清理/废弃暂存草稿
-   */
+  /** 主动清理/废弃暂存草稿 */
   @DeleteMapping
   public void clearDraft(
-      @PathVariable("docId") Long docId,
-      @RequestParam("workSpaceId") Long workSpaceId) {
+      @PathVariable("docId") Long docId, @RequestParam("workSpaceId") Long workSpaceId) {
     Long userId = SecurityHolder.getUserId();
     docDraftService.clearDraft(workSpaceId, docId, userId);
   }

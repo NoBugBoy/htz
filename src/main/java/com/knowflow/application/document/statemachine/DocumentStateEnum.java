@@ -2,9 +2,7 @@ package com.knowflow.application.document.statemachine;
 
 import lombok.Getter;
 
-/**
- * 文档全生命周期状态枚举
- */
+/** 文档全生命周期状态枚举 */
 @Getter
 public enum DocumentStateEnum {
 

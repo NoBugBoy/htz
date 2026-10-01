@@ -1,7 +1,6 @@
 package com.knowflow.application.document.parser.engine;
 
 import cn.hutool.core.io.IoUtil;
-import cn.hutool.core.util.StrUtil;
 import com.knowflow.application.common.storage.FileStorageGateway;
 import com.knowflow.application.document.parser.DocParseCommand;
 import com.knowflow.application.document.parser.DocParseResult;
@@ -17,9 +16,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 /**
- * 默认 Mock / 本地转换引擎
- * 提供开箱即用的纯文本直读、Word 结构化 Mock 转换以及 PDF 双轨制支持，
- * 并输出规范日志，便于后续无缝切入独立 MarkItDown 微服务或 MinerU API。
+ * 默认 Mock / 本地转换引擎 提供开箱即用的纯文本直读、Word 结构化 Mock 转换以及 PDF 双轨制支持， 并输出规范日志，便于后续无缝切入独立 MarkItDown 微服务或
+ * MinerU API。
  */
 @Slf4j
 @Component
@@ -38,14 +36,16 @@ public class MockDocParserEngine implements DocParserEngine {
 
   @Override
   public boolean supports(String fileExtension) {
-    return StrUtil.isNotBlank(fileExtension) && SUPPORTED_EXTS.contains(fileExtension.toLowerCase());
+    return cn.hutool.core.text.CharSequenceUtil.isNotBlank(fileExtension)
+        && SUPPORTED_EXTS.contains(fileExtension.toLowerCase());
   }
 
   @Override
   public DocParseResult parse(DocParseCommand command) {
     String ext = command.fileExtension();
-    String fileName = StrUtil.blankToDefault(command.fileName(), "未命名文档");
-    String baseTitle = StrUtil.subBefore(fileName, ".", true);
+    String fileName =
+        cn.hutool.core.text.CharSequenceUtil.blankToDefault(command.fileName(), "未命名文档");
+    String baseTitle = cn.hutool.core.text.CharSequenceUtil.subBefore(fileName, ".", true);
 
     log.info(
         "【DocParser】使用 [{}] 解析文件: fileName={}, ext={}, preferredEngine={}",
@@ -58,7 +58,7 @@ public class MockDocParserEngine implements DocParserEngine {
     try {
       if (command.contentStream() != null) {
         inputStream = command.contentStream();
-      } else if (StrUtil.isNotBlank(command.storagePath())) {
+      } else if (cn.hutool.core.text.CharSequenceUtil.isNotBlank(command.storagePath())) {
         inputStream = fileStorageGateway.download(command.storagePath());
       }
 
@@ -68,8 +68,12 @@ public class MockDocParserEngine implements DocParserEngine {
       meta.put("engine", getEngineType().name());
 
       // 1. 纯文本类 (Markdown / TXT / HTML) -> 100% 自由编辑
-      if ("md".equalsIgnoreCase(ext) || "markdown".equalsIgnoreCase(ext) || "txt".equalsIgnoreCase(ext) || "html".equalsIgnoreCase(ext)) {
-        String content = (inputStream != null) ? IoUtil.read(inputStream, StandardCharsets.UTF_8) : "";
+      if ("md".equalsIgnoreCase(ext)
+          || "markdown".equalsIgnoreCase(ext)
+          || "txt".equalsIgnoreCase(ext)
+          || "html".equalsIgnoreCase(ext)) {
+        String content =
+            (inputStream != null) ? IoUtil.read(inputStream, StandardCharsets.UTF_8) : "";
         String suggestedTitle = extractTitleFromMarkdown(content, baseTitle);
         meta.put("wordCount", content.length());
         return DocParseResult.success(content, content, suggestedTitle, getEngineType(), meta);
@@ -78,7 +82,8 @@ public class MockDocParserEngine implements DocParserEngine {
       // 2. 办公类 (Word/DOCX) -> 自动转换为 Markdown
       if ("docx".equalsIgnoreCase(ext) || "doc".equalsIgnoreCase(ext)) {
         log.info(
-            "【DocParser】已截获 Word 文档 [{}]，当前环境使用 Mock 转换器输出结构化 Markdown。预留 MarkItDown / MinerU API 真实转换通道。",
+            "【DocParser】已截获 Word 文档 [{}]，当前环境使用 Mock 转换器输出结构化 Markdown。预留 MarkItDown / MinerU API"
+                + " 真实转换通道。",
             fileName);
 
         String mockMarkdown = buildMockWordMarkdown(baseTitle);
@@ -93,7 +98,8 @@ public class MockDocParserEngine implements DocParserEngine {
           // 默认轨：只读附件预览
           log.info("【DocParser】PDF 文档 [{}] 采用默认双轨制策略：作为可检索的只读附件预览", fileName);
           meta.put("dualTrackMode", "PREVIEW_ONLY");
-          return DocParseResult.previewOnly("【PDF 预览模式】" + baseTitle, baseTitle, getEngineType(), meta);
+          return DocParseResult.previewOnly(
+              "【PDF 预览模式】" + baseTitle, baseTitle, getEngineType(), meta);
         } else {
           // 提炼轨：一键 AI 提炼为在线文档
           log.info("【DocParser】收到 PDF 一键提取请求 [{}]，调用提炼管线生成 Markdown 副本", fileName);
@@ -113,7 +119,7 @@ public class MockDocParserEngine implements DocParserEngine {
   }
 
   private String extractTitleFromMarkdown(String content, String defaultTitle) {
-    if (StrUtil.isBlank(content)) {
+    if (cn.hutool.core.text.CharSequenceUtil.isBlank(content)) {
       return defaultTitle;
     }
     for (String line : content.split("\n")) {

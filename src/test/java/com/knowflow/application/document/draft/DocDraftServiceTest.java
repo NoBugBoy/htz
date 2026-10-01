@@ -47,8 +47,7 @@ class DocDraftServiceTest {
   void testSaveDraftSuccess() {
     when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
 
-    DocDraftDTO draft =
-        new DocDraftDTO(1L, 100L, 99L, "草稿标题", "正在打字...", 12, LocalDateTime.now());
+    DocDraftDTO draft = new DocDraftDTO(1L, 100L, 99L, "草稿标题", "正在打字...", 12, LocalDateTime.now());
 
     draftService.saveDraft(draft);
 
@@ -63,8 +62,7 @@ class DocDraftServiceTest {
     LocalDateTime dbTime = LocalDateTime.now().minusMinutes(10);
     LocalDateTime draftTime = LocalDateTime.now();
 
-    DocDraftDTO draft =
-        new DocDraftDTO(1L, 100L, 99L, "最新草稿", "比数据库新的内容", 20, draftTime);
+    DocDraftDTO draft = new DocDraftDTO(1L, 100L, 99L, "最新草稿", "比数据库新的内容", 20, draftTime);
     String draftJson = objectMapper.writeValueAsString(draft);
 
     when(valueOperations.get("kf:doc:draft:1:100:99")).thenReturn(draftJson);

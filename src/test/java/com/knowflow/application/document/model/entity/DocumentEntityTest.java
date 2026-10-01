@@ -16,8 +16,7 @@ class DocumentEntityTest {
   @DisplayName("创建手写 Markdown 文档 - 默认状态为草稿且版本为 0")
   void testCreateManualDocument() {
     DocumentEntity doc =
-        DocumentEntity.createManual(
-            1L, 10L, "设计规范", "摘要描述", "# 正文内容", WorkSpaceAclEnum.INTERNAL);
+        DocumentEntity.createManual(1L, 10L, "设计规范", "摘要描述", "# 正文内容", WorkSpaceAclEnum.INTERNAL);
 
     assertThat(doc.getWorkSpaceId()).isEqualTo(1L);
     assertThat(doc.getCategoryId()).isEqualTo(10L);
@@ -25,9 +24,9 @@ class DocumentEntityTest {
     assertThat(doc.getContent()).isEqualTo("# 正文内容");
     assertThat(doc.getStatus()).isEqualTo(DocumentStateEnum.DRAFT);
     assertThat(doc.getSourceType()).isEqualTo(DocSourceTypeEnum.MANUAL);
-    assertThat(doc.getCurrentVersion()).isEqualTo(0);
-    assertThat(doc.getReadCount()).isEqualTo(0);
-    assertThat(doc.getLikeCount()).isEqualTo(0);
+    assertThat(doc.getCurrentVersion()).isZero();
+    assertThat(doc.getReadCount()).isZero();
+    assertThat(doc.getLikeCount()).isZero();
   }
 
   @Test
@@ -58,8 +57,7 @@ class DocumentEntityTest {
   @Test
   @DisplayName("内容更新与编辑状态守卫")
   void testUpdateContentAndGuard() {
-    DocumentEntity doc =
-        DocumentEntity.createManual(1L, 0L, "旧标题", null, "旧内容", null);
+    DocumentEntity doc = DocumentEntity.createManual(1L, 0L, "旧标题", null, "旧内容", null);
 
     doc.updateContent("新标题", "新摘要", "新内容", 3);
     assertThat(doc.getTitle()).isEqualTo("新标题");
@@ -77,8 +75,7 @@ class DocumentEntityTest {
   @Test
   @DisplayName("版本回滚 - 还原正文并退回草稿状态")
   void testRollbackToVersion() {
-    DocumentEntity doc =
-        DocumentEntity.createManual(1L, 0L, "初始", null, "初始内容", null);
+    DocumentEntity doc = DocumentEntity.createManual(1L, 0L, "初始", null, "初始内容", null);
     doc.publishNewVersion("v1.0");
 
     doc.rollbackToVersion(1, "初始", "初始内容");

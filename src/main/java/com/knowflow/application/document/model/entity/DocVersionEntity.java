@@ -1,6 +1,6 @@
 package com.knowflow.application.document.model.entity;
 
-import cn.hutool.core.util.StrUtil;
+import cn.hutool.core.text.CharSequenceUtil;
 import com.knowflow.application.common.BaseEntity;
 import com.knowflow.application.exception.BusinessException;
 import jakarta.persistence.Column;
@@ -12,10 +12,7 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-/**
- * 文档历史版本快照实体
- * 每次正式发布或生成里程碑时固化不可变快照，支持 Myers Diff 差异对比与一键回退
- */
+/** 文档历史版本快照实体 每次正式发布或生成里程碑时固化不可变快照，支持 Myers Diff 差异对比与一键回退 */
 @Entity
 @org.hibernate.annotations.Immutable
 @Table(
@@ -66,9 +63,7 @@ public class DocVersionEntity extends BaseEntity {
   @Column(name = "word_count", nullable = false)
   private Integer wordCount;
 
-  /**
-   * 静态工厂：创建不可变历史版本快照
-   */
+  /** 静态工厂：创建不可变历史版本快照 */
   public static DocVersionEntity createSnapshot(
       Long workSpaceId,
       Long documentId,
@@ -82,7 +77,7 @@ public class DocVersionEntity extends BaseEntity {
     Objects.requireNonNull(documentId, "文档ID不能为空");
     Objects.requireNonNull(versionNumber, "版本号不能为空");
     Objects.requireNonNull(publisherId, "发布人ID不能为空");
-    if (StrUtil.isBlank(title)) {
+    if (CharSequenceUtil.isBlank(title)) {
       throw BusinessException.badRequest("快照标题不能为空");
     }
 
@@ -90,7 +85,7 @@ public class DocVersionEntity extends BaseEntity {
     entity.workSpaceId = workSpaceId;
     entity.documentId = documentId;
     entity.versionNumber = versionNumber;
-    entity.versionTag = StrUtil.blankToDefault(versionTag, "v" + versionNumber + ".0");
+    entity.versionTag = CharSequenceUtil.blankToDefault(versionTag, "v" + versionNumber + ".0");
     entity.title = title.trim();
     entity.content = content == null ? "" : content;
     entity.changeSummary = changeSummary;
