@@ -3,3 +3,12 @@ spring:
     name: trade
   profiles:
     active: local
+  elasticsearch:
+    uris: ${ES_URIS:http://localhost:9200}
+    socket-timeout: 30s
+    connection-timeout: 5s
+
+knowflow:
+  elasticsearch:
+    index-name: knowflow_doc_index
+    auto-create-index: true

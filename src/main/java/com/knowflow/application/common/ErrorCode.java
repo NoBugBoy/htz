@@ -51,7 +51,9 @@ public interface ErrorCode {
     DOC_NOT_FOUND("DOC_NOT_FOUND", "文档不存在或已被删除", HttpStatus.NOT_FOUND),
     DOC_VERSION_NOT_FOUND("DOC_VERSION_NOT_FOUND", "指定的版本快照不存在", HttpStatus.NOT_FOUND),
     DOC_ACCESS_DENIED("DOC_ACCESS_DENIED", "无权访问该文档", HttpStatus.FORBIDDEN),
-    FILE_STORAGE_ERROR("FILE_STORAGE_ERROR", "文件存储服务异常", HttpStatus.INTERNAL_SERVER_ERROR);
+    FILE_STORAGE_ERROR("FILE_STORAGE_ERROR", "文件存储服务异常", HttpStatus.INTERNAL_SERVER_ERROR),
+    ES_INDEX_FAILED("ES_INDEX_FAILED", "ES 索引写入失败", HttpStatus.INTERNAL_SERVER_ERROR),
+    ES_SEARCH_FAILED("ES_SEARCH_FAILED", "ES 检索执行失败", HttpStatus.INTERNAL_SERVER_ERROR);
 
     private final String code;
     private final String message;

@@ -27,6 +27,7 @@
         <minio.version>8.5.17</minio.version>
         <groovy.version>4.0.24</groovy.version>
         <cola-statemachine.version>4.3.2</cola-statemachine.version>
+        <elasticsearch.version>8.17.2</elasticsearch.version>
         <sonar.coverage.exclusions>
             **/model/**,
             **/dto/**,
@@ -84,6 +85,10 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-redis</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-elasticsearch</artifactId>
         </dependency>
 
         <!-- 👈 1. 补全：Flyway 数据库自动化迁移依赖 -->
@@ -164,6 +169,11 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-webmvc-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-elasticsearch-test</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>

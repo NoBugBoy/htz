@@ -81,6 +81,17 @@ services:
       - "9300:9300"
     volumes:
       - es_data:/usr/share/elasticsearch/data
+    # 安装 IK 中文分词插件（版本须与 ES 镜像版本严格一致）
+    # 首次启动耗时较长（需下载插件），后续因 es_data 卷持久化会跳过
+    command: >
+      /bin/bash -c "
+        if [ ! -d /usr/share/elasticsearch/plugins/analysis-ik ]; then
+          echo '>>> 安装 IK 中文分词插件 ...' &&
+          /usr/share/elasticsearch/bin/elasticsearch-plugin install --batch
+          https://release.infinilabs.com/analysis-ik/stable/elasticsearch-analysis-ik-8.17.0.zip;
+        fi &&
+        /usr/local/bin/docker-entrypoint.sh eswrapper
+      "
     healthcheck:
       test: [ "CMD-SHELL", "curl -sf http://localhost:9200/_cluster/health | grep -qv '\"status\":\"red\"'" ]
       interval: 15s

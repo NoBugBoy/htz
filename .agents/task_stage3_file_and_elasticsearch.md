@@ -82,11 +82,11 @@ dense_vector 字段预留 → RAG 双路召回
 
 ### 任务组 1：依赖引入与基础设施配置
 
-- [ ] **1.1 引入 Spring Data Elasticsearch 依赖**
+- [x] **1.1 引入 Spring Data Elasticsearch 依赖**
   - `pom.xml` 引入 `spring-boot-starter-data-elasticsearch`，确认版本与 Spring Boot 4.x 兼容。
   - 新增版本变量 `<elasticsearch.version>` 统一管理。
 
-- [ ] **1.2 配置 ES 连接**
+- [x] **1.2 配置 ES 连接**
   - `application.yml` 新增：
     ```yaml
     spring:
@@ -101,7 +101,7 @@ dense_vector 字段预留 → RAG 双路召回
     ```
   - 新增 `ElasticsearchProperties`（`@ConfigurationProperties(prefix = "knowflow.elasticsearch")`）。
 
-- [ ] **1.3 新增 ES 相关错误码**
+- [x] **1.3 新增 ES 相关错误码**
   - 在 `ErrorCode.java` 的 `Document` 枚举中追加：
     - `ES_INDEX_FAILED`：ES 索引写入失败
     - `ES_SEARCH_FAILED`：ES 检索执行失败
@@ -110,7 +110,7 @@ dense_vector 字段预留 → RAG 双路召回
 
 ### 任务组 2：Elasticsearch 文档实体与索引设计
 
-- [ ] **2.1 设计 `DocSearchDocument`（ES 文档实体）**
+- [x] **2.1 设计 `DocSearchDocument`（ES 文档实体）**
   - 路径：`document/search/DocSearchDocument.java`
   - 使用 `@Document(indexName = "#{@elasticsearchProperties.indexName}")`（动态引用配置）
 
@@ -131,13 +131,13 @@ dense_vector 字段预留 → RAG 双路召回
   | `publishedAt` | `date` | — | 发布时间，用于时间排序 |
   | `contentVector` | `dense_vector(1536)` | — | **阶段四填充**，阶段三写 `null` 占位 |
 
-- [ ] **2.2 定义 `DocSearchRepository`**
+- [x] **2.2 定义 `DocSearchRepository`**
   - 路径：`document/search/DocSearchRepository.java`
   - 继承 `ElasticsearchRepository<DocSearchDocument, String>`
   - 补充自定义方法：
     - `void deleteByWorkspaceIdAndId(String workspaceId, String id)` — 按工作区安全删除
 
-- [ ] **2.3 ES 索引自动初始化**
+- [x] **2.3 ES 索引自动初始化**
   - 路径：`document/search/ElasticsearchIndexInitializer.java`
   - `@PostConstruct` + `@ConditionalOnProperty(name = "knowflow.elasticsearch.auto-create-index", havingValue = "true")`
   - 通过 `IndexOperations` 检查索引是否存在，不存在则创建并应用 Mapping（含 IK 分词器 settings）。
@@ -146,7 +146,7 @@ dense_vector 字段预留 → RAG 双路召回
 
 ### 任务组 3：ES 索引同步——异步事件监听器
 
-- [ ] **3.1 实现 `DocumentSearchSyncListener`**
+- [x] **3.1 实现 `DocumentSearchSyncListener`**
   - 路径：`document/search/DocumentSearchSyncListener.java`
   - `@EventListener` + `@Async` 监听 `DocumentStateTransitionEvent`
   - 路由逻辑：
@@ -165,7 +165,7 @@ dense_vector 字段预留 → RAG 双路召回
     4. `DocSearchRepository.save(searchDoc)` 写入 ES
   - 异常处理：记录 `log.error`，不影响主流程（已在独立 `@Async` 线程中隔离）。
 
-- [ ] **3.2 新增 `DocSearchMapper`（MapStruct）**
+- [x] **3.2 新增 `DocSearchMapper`（MapStruct）**
   - 路径：`document/mapper/DocSearchMapper.java`
   - 映射规则：
     - `DocumentEntity` → `DocSearchDocument` 主字段映射
@@ -177,7 +177,7 @@ dense_vector 字段预留 → RAG 双路召回
 
 ### 任务组 4：搜索 DTO 与接口实现（Query 侧）
 
-- [ ] **4.1 定义搜索 DTO（全 record 设计）**
+- [x] **4.1 定义搜索 DTO（全 record 设计）**
   - `DocumentSearchRequest`（record）：
     - `keyword`（`@NotBlank`）、`workspaceId`（`@NotNull`）、`categoryId`（可选）
     - `tags`（`List<String>`，可选）、`pageNum`（default=1）、`pageSize`（default=20）
@@ -188,7 +188,7 @@ dense_vector 字段预留 → RAG 双路召回
     - `hitSnippet`（正文/rawText 命中摘要，最多 200 字，带高亮）
     - `categoryId`、`tags`、`sourceType`、`publishedAt`
 
-- [ ] **4.2 实现 `DocumentSearchQueryService`**
+- [x] **4.2 实现 `DocumentSearchQueryService`**
   - 路径：`document/service/DocumentSearchQueryService.java` + `impl/`
   - 使用 `NativeQuery` + `ElasticsearchTemplate` 构建查询：
     ```
@@ -209,11 +209,11 @@ dense_vector 字段预留 → RAG 双路召回
     ```
   - 搜索完成后**异步**调用 `SearchHistoryService.record(userId, keyword)`（非阻塞）。
 
-- [ ] **4.3 实现 `SearchSuggestQueryService`（自动补全）**
+- [x] **4.3 实现 `SearchSuggestQueryService`（自动补全）**
   - 基于 `DocSearchDocument.titleSuggest`（`@CompletionField`）实现 Suggester 查询。
   - 返回最多 10 条 `List<String>` 候选词，供前端搜索框实时提示。
 
-- [ ] **4.4 实现 `SearchHistoryService`**
+- [x] **4.4 实现 `SearchHistoryService`**
   - 路径：`document/service/SearchHistoryService.java`
   - **写入**：Redis `ZSet`，Key = `kf:search:history:{userId}`，score = 当前时间戳，member = keyword
     - 写入后立即 `ZREMRANGEBYRANK` 保留最新 20 条
@@ -226,7 +226,7 @@ dense_vector 字段预留 → RAG 双路召回
 
 ### 任务组 5：数据库补充（搜索历史归档表）
 
-- [ ] **5.1 Flyway 迁移脚本**
+- [ ] **5.1 Flyway 迁移脚本（按要求暂缓落地）**
   - 文件：`V3__add_search_history.sql`
   - 建表：`kf_search_history`
     ```sql
@@ -240,15 +240,16 @@ dense_vector 字段预留 → RAG 双路召回
     CREATE INDEX idx_search_history_user ON kf_search_history (user_id, search_at DESC);
     ```
 
-- [ ] **5.2 `SearchHistoryEntity` + `SearchHistoryRepository`**
+- [x] **5.2 `SearchHistoryEntity` + `SearchHistoryRepository`**
   - 仅用于异步归档，无需充血方法（纯数据记录，`@Entity` + 静态工厂 `of(userId, workspaceId, keyword)` 即可）。
+  - 已补充 `SearchHistoryArchiveListener` 监听领域事件异步落库。
 
 ---
 
 ### 任务组 6：Controller 接口暴露
 
-- [ ] **6.1 新增 `DocumentSearchController`**
-  - 路径：`document/api/DocumentSearchController.java`
+- [x] **6.1 新增 `DocumentSearchController`**
+  - 路径：`document/controller/DocumentSearchController.java`
   - 基础路径：`/api/search`
 
   | Method | Path | 参数 | 说明 |
@@ -265,17 +266,21 @@ dense_vector 字段预留 → RAG 双路召回
 
 > 测试范围：核心业务逻辑，Mock ES / Redis 外部依赖。
 
-- [ ] **7.1 `DocumentSearchSyncListener` 测试**
+- [x] **7.1 `DocumentSearchSyncListener` 测试**
   - Mock `DocumentRepository`、`DocSourceFileRepository`、`DocSearchRepository`
   - 覆盖：`PUBLISHED` 事件 → 索引写入调用；`ARCHIVED` 事件 → 删除调用；`PENDING_REVIEW` 事件 → 无操作
 
-- [ ] **7.2 `DocumentSearchQueryService` 测试**
+- [x] **7.2 `DocumentSearchQueryService` 测试**
   - Mock `ElasticsearchTemplate` 返回固定 `SearchHits`
   - 验证：高亮字段正确提取并映射到 `hitSnippet`；`workspaceId` filter 必须存在于构建的 Query 中；`SearchHistoryService.record` 被异步调用
 
-- [ ] **7.3 `SearchHistoryService` 测试**
+- [x] **7.3 `SearchHistoryService` 测试**
   - Mock `RedisTemplate`（`ZSetOperations`）
   - 覆盖：写入 + 超 20 条自动淘汰、倒序读取、删除单条、清空
+
+- [x] **7.4 `DocumentSearchController` 测试**
+  - Mock `DocumentSearchQueryService`、`SearchSuggestQueryService`、`SearchHistoryService`
+  - 覆盖：5 个 REST 路由的成功调用、参数绑定、`@Valid` 参数校验拦截与用户安全上下文集成
 
 ---
 
@@ -310,10 +315,10 @@ dense_vector 字段预留 → RAG 双路召回
 
 | 实施步骤 | 核心交付成果 | 关键文件 |
 |:---------|:------------|:---------|
-| **Step 3.1：依赖与基础设施** | 引入 ES 依赖，配置连接，新增错误码，`ElasticsearchProperties` | `pom.xml`、`application.yml`、`ErrorCode` |
-| **Step 3.2：ES 实体与 Mapping** | `DocSearchDocument` 设计，`DocSearchRepository`，索引自动初始化 | `DocSearchDocument`、`ElasticsearchIndexInitializer` |
-| **Step 3.3：异步索引同步** | 监听 `DocumentStateTransitionEvent`，异步写入/删除 ES | `DocumentSearchSyncListener`、`DocSearchMapper` |
-| **Step 3.4：搜索接口实现** | 关键词高亮搜索、自动补全 Suggester | `DocumentSearchQueryService`、`SearchSuggestQueryService` |
-| **Step 3.5：搜索历史** | Redis ZSet + DB 异步归档 | `SearchHistoryService`、`SearchHistoryEntity`、`V3__add_search_history.sql` |
-| **Step 3.6：Controller 接口** | 5 个 REST 接口暴露 | `DocumentSearchController` |
-| **Step 3.7：单元测试** | 覆盖同步监听、搜索服务、历史服务核心分支 | `*Test.java` |
+| **Step 3.1：依赖与基础设施** [x]已完成 | 引入 ES 依赖，配置连接，新增错误码，`ElasticsearchProperties` | `pom.xml`、`application.yml`、`ErrorCode` |
+| **Step 3.2：ES 实体与 Mapping** [x]已完成 | `DocSearchDocument` 设计，`DocSearchRepository`，索引自动初始化 | `DocSearchDocument`、`ElasticsearchIndexInitializer` |
+| **Step 3.3：异步索引同步** [x]已完成 | 监听 `DocumentStateTransitionEvent`，异步写入/删除 ES | `DocumentSearchSyncListener`、`DocSearchMapper` |
+| **Step 3.4：搜索接口实现** [x]已完成 | 关键词高亮搜索、自动补全 Suggester | `DocumentSearchQueryService`、`SearchSuggestQueryService` |
+| **Step 3.5：搜索历史** [x]已完成 | Redis ZSet + DB 异步归档 (Flyway 按需延后) | `SearchHistoryService`、`SearchHistoryEntity`、`SearchHistoryArchiveListener` |
+| **Step 3.6：Controller 接口** [x]已完成 | 5 个 REST 接口暴露 | `DocumentSearchController` |
+| **Step 3.7：单元测试** [x]已完成 | 覆盖同步监听、搜索服务、历史服务、控制器核心分支 | `*Test.java` |

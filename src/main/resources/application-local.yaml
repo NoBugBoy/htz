@@ -36,6 +36,10 @@ spring:
           auth: true
           ssl:
             enable: true
+  elasticsearch:
+    uris: ${ES_URIS:http://localhost:9200}
+    socket-timeout: 30s
+    connection-timeout: 5s
 
 wx:
   miniapp:
@@ -70,3 +74,8 @@ knowflow:
     mineru:
       endpoint:
       api-key:
+
+  # ── Elasticsearch 全文检索 ───────────────────────────────────────────────────
+  elasticsearch:
+    index-name: knowflow_doc_index
+    auto-create-index: true

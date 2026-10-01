@@ -7,9 +7,11 @@ import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 import org.springframework.boot.security.autoconfigure.UserDetailsServiceAutoConfiguration;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.web.config.EnableSpringDataWebSupport;
+import org.springframework.scheduling.annotation.EnableAsync;
 
 @SpringBootApplication(exclude = {UserDetailsServiceAutoConfiguration.class})
 @ConfigurationPropertiesScan
+@EnableAsync
 @EnableSpringDataWebSupport(
     pageSerializationMode = EnableSpringDataWebSupport.PageSerializationMode.VIA_DTO)
 @Import(RegisterBeanConfig.class)

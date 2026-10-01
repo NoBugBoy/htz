@@ -15,6 +15,11 @@ public record DocumentStateTransitionEvent(
     LocalDateTime timestamp
 ) {
 
+  /** 目标状态别名，对齐状态机流转语义 */
+  public DocumentStateEnum targetState() {
+    return toState;
+  }
+
   public static DocumentStateTransitionEvent of(
       Long documentId,
       DocumentStateEnum fromState,
