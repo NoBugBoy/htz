@@ -1,6 +1,6 @@
 package com.knowflow.application.document.service;
 
-import cn.hutool.core.util.StrUtil;
+import cn.hutool.core.text.CharSequenceUtil;
 import com.knowflow.application.document.acl.DocAccessControlService;
 import com.knowflow.application.document.api.dto.DocumentDTO;
 import com.knowflow.application.document.mapper.DocumentMapper;
@@ -22,10 +22,7 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * 文档核心查询服务 (CQRS - Query Side)
- * 聚合文档详情拉取、异步阅读量统计、动态条件分页与 ACL 读权限过滤
- */
+/** 文档核心查询服务 (CQRS - Query Side) 聚合文档详情拉取、异步阅读量统计、动态条件分页与 ACL 读权限过滤 */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -36,9 +33,7 @@ public class DocumentQueryService {
   private final DocumentMapper documentMapper;
   private final ApplicationEventPublisher eventPublisher;
 
-  /**
-   * 按 ID 查阅文档详情（附带读权限断言，阅读量通过异步事件解耦）
-   */
+  /** 按 ID 查阅文档详情（附带读权限断言，阅读量通过异步事件解耦） */
   @Transactional(readOnly = true)
   public Optional<DocumentDTO> getById(Long id, Long userId) {
     Optional<DocumentEntity> docOpt = documentRepository.findById(id);
@@ -55,9 +50,7 @@ public class DocumentQueryService {
     return Optional.of(documentMapper.toDTO(doc));
   }
 
-  /**
-   * 异步监听阅读事件：执行原子更新
-   */
+  /** 异步监听阅读事件：执行原子更新 */
   @Async
   @EventListener
   @Transactional
@@ -67,9 +60,7 @@ public class DocumentQueryService {
     }
   }
 
-  /**
-   * 动态多条件分页检索文档列表
-   */
+  /** 动态多条件分页检索文档列表 */
   @Transactional(readOnly = true)
   public Page<DocumentDTO> page(DocumentPageRequest request, Long userId) {
     Specification<DocumentEntity> spec =
@@ -90,7 +81,7 @@ public class DocumentQueryService {
           }
 
           // 4. 标题与摘要模糊关键词搜索
-          if (StrUtil.isNotBlank(request.keyword())) {
+          if (CharSequenceUtil.isNotBlank(request.keyword())) {
             String kw = "%" + request.keyword().trim().toLowerCase() + "%";
             predicates.add(
                 cb.or(
@@ -105,9 +96,7 @@ public class DocumentQueryService {
     return entityPage.map(documentMapper::toDTO);
   }
 
-  /**
-   * 按分类拉取文档精简列表（补充团队权限断言）
-   */
+  /** 按分类拉取文档精简列表（补充团队权限断言） */
   @Transactional(readOnly = true)
   public List<DocumentDTO> listByCategory(Long workSpaceId, Long categoryId, Long userId) {
     docAccessControlService.assertCanReadWorkSpace(workSpaceId, userId);

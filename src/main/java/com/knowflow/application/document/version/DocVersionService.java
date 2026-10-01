@@ -15,42 +15,43 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * 文档版本快照管理与多版本比对用例服务
- * 负责不可变里程碑快照生成、版本内容提取比对、版本列表拉取与一键回退
- * （注：Diff 逐行高亮计算移至前端渲染，后端提供纯净的原文本对比契约）
- */
+/** 文档版本快照管理与多版本比对用例服务 负责不可变里程碑快照生成、版本内容提取比对、版本列表拉取与一键回退 （注：Diff 逐行高亮计算移至前端渲染，后端提供纯净的原文本对比契约） */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class DocVersionService {
 
+  private static final String DOC_NOT_FOUND_MSG = "文档不存在";
   private final DocumentRepository documentRepository;
   private final DocVersionRepository docVersionRepository;
   private final DocVersionMapper docVersionMapper;
   private final com.knowflow.application.document.mapper.DocumentMapper documentMapper;
 
-  /**
-   * 创建不可变里程碑版本快照 (支持 Request 对象直接传入)
-   */
+  /** 创建不可变里程碑版本快照 (支持 Request 对象直接传入) */
   @Transactional
   public DocVersionDTO createSnapshot(
-      Long documentId, com.knowflow.application.document.model.request.DocVersionCreateRequest request, Long publisherId) {
+      Long documentId,
+      com.knowflow.application.document.model.request.DocVersionCreateRequest request,
+      Long publisherId) {
     String tag = request != null ? request.versionTag() : null;
     String summary = request != null ? request.changeSummary() : null;
-    return createSnapshot(documentId, tag, summary, publisherId);
+    return doCreateSnapshot(documentId, tag, summary, publisherId);
   }
 
-  /**
-   * 创建不可变里程碑版本快照
-   */
+  /** 创建不可变里程碑版本快照 */
   @Transactional
   public DocVersionDTO createSnapshot(
+      Long documentId, String customVersionTag, String changeSummary, Long publisherId) {
+    return doCreateSnapshot(documentId, customVersionTag, changeSummary, publisherId);
+  }
+
+  private DocVersionDTO doCreateSnapshot(
       Long documentId, String customVersionTag, String changeSummary, Long publisherId) {
     DocumentEntity doc =
         documentRepository
             .findById(documentId)
-            .orElseThrow(() -> new BusinessException(ErrorCode.Document.DOC_NOT_FOUND, "文档不存在"));
+            .orElseThrow(
+                () -> new BusinessException(ErrorCode.Document.DOC_NOT_FOUND, DOC_NOT_FOUND_MSG));
 
     int nextVersionNumber = doc.publishNewVersion(customVersionTag);
 
@@ -77,9 +78,7 @@ public class DocVersionService {
     return docVersionMapper.toDTO(savedSnapshot);
   }
 
-  /**
-   * 一键回退到指定历史版本
-   */
+  /** 一键回退到指定历史版本 */
   @Transactional
   public com.knowflow.application.document.api.dto.DocumentDTO rollbackToVersion(
       Long documentId, Integer targetVersionNumber, Long operatorId) {
@@ -94,7 +93,8 @@ public class DocVersionService {
             .orElseThrow(
                 () ->
                     new BusinessException(
-                        ErrorCode.Document.DOC_VERSION_NOT_FOUND, "指定版本快照不存在: v" + targetVersionNumber));
+                        ErrorCode.Document.DOC_VERSION_NOT_FOUND,
+                        "指定版本快照不存在: v" + targetVersionNumber));
 
     doc.rollbackToVersion(
         targetVersion.getVersionNumber(), targetVersion.getTitle(), targetVersion.getContent());
@@ -118,7 +118,8 @@ public class DocVersionService {
    * @param newVersionNumber 新版本号（若为 null 则对比当前未发布的草稿内容）
    */
   @Transactional(readOnly = true)
-  public DocVersionCompareDTO compareVersions(Long documentId, Integer oldVersionNumber, Integer newVersionNumber) {
+  public DocVersionCompareDTO compareVersions(
+      Long documentId, Integer oldVersionNumber, Integer newVersionNumber) {
     DocumentEntity doc =
         documentRepository
             .findById(documentId)
@@ -134,7 +135,8 @@ public class DocVersionService {
               .orElseThrow(
                   () ->
                       new BusinessException(
-                          ErrorCode.Document.DOC_VERSION_NOT_FOUND, "旧版本不存在: v" + oldVersionNumber));
+                          ErrorCode.Document.DOC_VERSION_NOT_FOUND,
+                          "旧版本不存在: v" + oldVersionNumber));
       oldText = oldVer.getContent();
       oldTag = oldVer.getVersionTag();
     }
@@ -152,7 +154,8 @@ public class DocVersionService {
               .orElseThrow(
                   () ->
                       new BusinessException(
-                          ErrorCode.Document.DOC_VERSION_NOT_FOUND, "新版本不存在: v" + newVersionNumber));
+                          ErrorCode.Document.DOC_VERSION_NOT_FOUND,
+                          "新版本不存在: v" + newVersionNumber));
       newText = newVer.getContent();
       newTag = newVer.getVersionTag();
     }
@@ -164,18 +167,10 @@ public class DocVersionService {
         newVersionNumber);
 
     return new DocVersionCompareDTO(
-        documentId,
-        oldVersionNumber,
-        oldTag,
-        oldText,
-        newVersionNumber,
-        newTag,
-        newText);
+        documentId, oldVersionNumber, oldTag, oldText, newVersionNumber, newTag, newText);
   }
 
-  /**
-   * 查询文档所有历史版本列表（按版本序号倒序）
-   */
+  /** 查询文档所有历史版本列表（按版本序号倒序） */
   @Transactional(readOnly = true)
   public List<DocVersionDTO> listVersions(Long documentId) {
     List<DocVersionEntity> list =
@@ -183,9 +178,7 @@ public class DocVersionService {
     return docVersionMapper.toDTOList(list);
   }
 
-  /**
-   * 获取单次历史版本详情
-   */
+  /** 获取单次历史版本详情 */
   @Transactional(readOnly = true)
   public DocVersionDTO getVersion(Long documentId, Integer versionNumber) {
     DocVersionEntity entity =

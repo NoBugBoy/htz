@@ -43,8 +43,7 @@ class DocumentStateMachineEngineTest {
         DocumentEntity.createManual(1L, 0L, "设计规范", "摘要", "正文内容", WorkSpaceAclEnum.INTERNAL);
     ReflectionTestUtils.setField(doc, "id", 100L);
 
-    DocumentStateContext ctx =
-        DocumentStateContext.of(100L, doc, 10L, "MEMBER", "申请发布");
+    DocumentStateContext ctx = DocumentStateContext.of(100L, doc, 10L, "MEMBER", "申请发布");
 
     // 1. DRAFT -> PENDING_REVIEW (提交审批)
     DocumentStateEnum state1 = engine.fire(DocumentStateEnum.DRAFT, DocumentEventEnum.SUBMIT, ctx);
@@ -58,7 +57,7 @@ class DocumentStateMachineEngineTest {
 
     // 验证 Action 副作用：自动创建版本快照与清理草稿
     verify(docVersionService).createSnapshot(eq(100L), anyString(), eq("申请发布"), eq(10L));
-    verify(docDraftService).clearDraft(eq(1L), eq(100L), eq(10L));
+    verify(docDraftService).clearDraft(1L, 100L, 10L);
   }
 
   @Test
@@ -68,8 +67,7 @@ class DocumentStateMachineEngineTest {
         DocumentEntity.createManual(1L, 0L, "设计规范", "摘要", "正文内容", WorkSpaceAclEnum.INTERNAL);
     ReflectionTestUtils.setField(doc, "id", 100L);
 
-    DocumentStateContext ctx =
-        DocumentStateContext.of(100L, doc, 10L, "MEMBER", "内容需补全");
+    DocumentStateContext ctx = DocumentStateContext.of(100L, doc, 10L, "MEMBER", "内容需补全");
 
     // 1. PENDING_REVIEW -> REJECTED (审批驳回，填了原因，Condition 通过)
     DocumentStateEnum state1 =
@@ -89,14 +87,14 @@ class DocumentStateMachineEngineTest {
         DocumentEntity.createManual(1L, 0L, "已发布文档", "摘要", "正文内容", WorkSpaceAclEnum.INTERNAL);
     ReflectionTestUtils.setField(doc, "id", 101L);
 
-    DocumentStateContext revertCtx =
-        DocumentStateContext.of(101L, doc, 10L, "ADMIN", "重新编辑");
-    DocumentStateEnum draftState = engine.fire(DocumentStateEnum.PUBLISHED, DocumentEventEnum.REVERT_DRAFT, revertCtx);
+    DocumentStateContext revertCtx = DocumentStateContext.of(101L, doc, 10L, "ADMIN", "重新编辑");
+    DocumentStateEnum draftState =
+        engine.fire(DocumentStateEnum.PUBLISHED, DocumentEventEnum.REVERT_DRAFT, revertCtx);
     assertThat(draftState).isEqualTo(DocumentStateEnum.DRAFT);
 
-    DocumentStateContext archiveCtx =
-        DocumentStateContext.of(101L, doc, 10L, "ADMIN", "归档处理");
-    DocumentStateEnum archiveState = engine.fire(DocumentStateEnum.PUBLISHED, DocumentEventEnum.ARCHIVE, archiveCtx);
+    DocumentStateContext archiveCtx = DocumentStateContext.of(101L, doc, 10L, "ADMIN", "归档处理");
+    DocumentStateEnum archiveState =
+        engine.fire(DocumentStateEnum.PUBLISHED, DocumentEventEnum.ARCHIVE, archiveCtx);
     assertThat(archiveState).isEqualTo(DocumentStateEnum.ARCHIVED);
   }
 
@@ -107,10 +105,12 @@ class DocumentStateMachineEngineTest {
         DocumentEntity.createManual(1L, 0L, "设计规范", "摘要", "正文内容", WorkSpaceAclEnum.INTERNAL);
     ReflectionTestUtils.setField(doc, "id", 100L);
 
-    DocumentStateContext blankReasonCtx =
-        DocumentStateContext.of(100L, doc, 10L, "MEMBER", "   ");
+    DocumentStateContext blankReasonCtx = DocumentStateContext.of(100L, doc, 10L, "MEMBER", "   ");
 
-    assertThatThrownBy(() -> engine.fire(DocumentStateEnum.PENDING_REVIEW, DocumentEventEnum.REJECT, blankReasonCtx))
+    assertThatThrownBy(
+            () ->
+                engine.fire(
+                    DocumentStateEnum.PENDING_REVIEW, DocumentEventEnum.REJECT, blankReasonCtx))
         .isInstanceOf(BusinessException.class)
         .hasMessageContaining("无法执行 [审批驳回] 操作");
   }
@@ -150,7 +150,8 @@ class DocumentStateMachineEngineTest {
   void testIllegalTransition_PublishedCannotApprove() {
     DocumentStateContext ctx = DocumentStateContext.of(1L, 100L, "重复通过");
 
-    assertThatThrownBy(() -> engine.fire(DocumentStateEnum.PUBLISHED, DocumentEventEnum.APPROVE, ctx))
+    assertThatThrownBy(
+            () -> engine.fire(DocumentStateEnum.PUBLISHED, DocumentEventEnum.APPROVE, ctx))
         .isInstanceOf(BusinessException.class)
         .hasMessageContaining("无法执行 [审批通过] 操作");
   }

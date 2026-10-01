@@ -1,6 +1,6 @@
 package com.knowflow.application.document.parser.engine;
 
-import cn.hutool.core.util.StrUtil;
+import cn.hutool.core.text.CharSequenceUtil;
 import com.knowflow.application.document.parser.DocParseCommand;
 import com.knowflow.application.document.parser.DocParseResult;
 import com.knowflow.application.document.parser.DocParserEngine;
@@ -12,9 +12,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 /**
- * 微软 MarkItDown 解析引擎（预留适配器）
- * 后续可无缝对接独立部署的 Python MarkItDown 微服务 (HTTP/gRPC)
- * 当前未配置远程端点时，自动平滑委托给 MockDocParserEngine 处理
+ * 微软 MarkItDown 解析引擎（预留适配器） 后续可无缝对接独立部署的 Python MarkItDown 微服务 (HTTP/gRPC) 当前未配置远程端点时，自动平滑委托给
+ * MockDocParserEngine 处理
  */
 @Slf4j
 @Component
@@ -36,14 +35,14 @@ public class MarkItDownDocParserEngine implements DocParserEngine {
 
   @Override
   public boolean supports(String fileExtension) {
-    return StrUtil.isNotBlank(fileExtension) && SUPPORTED_EXTS.contains(fileExtension.toLowerCase());
+    return CharSequenceUtil.isNotBlank(fileExtension)
+        && SUPPORTED_EXTS.contains(fileExtension.toLowerCase());
   }
 
   @Override
   public DocParseResult parse(DocParseCommand command) {
-    if (StrUtil.isBlank(markitdownEndpoint)) {
-      log.info(
-          "【MarkItDown】未配置远程服务端点 (knowflow.parser.markitdown.endpoint)，平滑委托至 Mock 引擎处理");
+    if (CharSequenceUtil.isBlank(markitdownEndpoint)) {
+      log.info("【MarkItDown】未配置远程服务端点 (knowflow.parser.markitdown.endpoint)，平滑委托至 Mock 引擎处理");
       return mockFallback.parse(command);
     }
 

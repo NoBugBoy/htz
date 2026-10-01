@@ -34,7 +34,8 @@ class DocCategoryServiceTest {
 
   @BeforeEach
   void setUp() {
-    categoryService = new DocCategoryService(docCategoryRepository, documentRepository, docCategoryMapper);
+    categoryService =
+        new DocCategoryService(docCategoryRepository, documentRepository, docCategoryMapper);
   }
 
   @Test
@@ -67,8 +68,7 @@ class DocCategoryServiceTest {
   @Test
   @DisplayName("移动分类：禁止将分类移动至自身或自身子目录下")
   void testMoveCategoryToSelfOrDescendantFails() {
-    DocCategoryEntity parent =
-        DocCategoryEntity.create(1L, 0L, "根目录", 1, "/0/", 0);
+    DocCategoryEntity parent = DocCategoryEntity.create(1L, 0L, "根目录", 1, "/0/", 0);
     ReflectionTestUtils.setField(parent, "id", 10L);
     ReflectionTestUtils.setField(parent, "path", "/0/10/");
 
@@ -80,8 +80,7 @@ class DocCategoryServiceTest {
         .hasMessageContaining("不能将分类移动到自己内部");
 
     // 尝试移动到子目录
-    DocCategoryEntity child =
-        DocCategoryEntity.create(1L, 10L, "子目录", 1, "/0/10/", 1);
+    DocCategoryEntity child = DocCategoryEntity.create(1L, 10L, "子目录", 1, "/0/10/", 1);
     ReflectionTestUtils.setField(child, "id", 20L);
     ReflectionTestUtils.setField(child, "path", "/0/10/20/");
 

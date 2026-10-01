@@ -5,9 +5,7 @@ import com.knowflow.application.document.statemachine.DocumentStateEnum;
 import com.knowflow.application.enums.WorkSpaceAclEnum;
 import java.time.LocalDateTime;
 
-/**
- * 文档核心数据传输对象 (不可变 record)
- */
+/** 文档核心数据传输对象 (不可变 record) */
 public record DocumentDTO(
     Long id,
     Long workSpaceId,
@@ -27,5 +25,4 @@ public record DocumentDTO(
     Integer likeCount,
     Long createBy,
     LocalDateTime createTime,
-    LocalDateTime updateTime
-) {}
+    LocalDateTime updateTime) {}

@@ -21,7 +21,6 @@ import com.knowflow.application.document.statemachine.DocumentStateEnum;
 import com.knowflow.application.enums.WorkSpaceAclEnum;
 import com.knowflow.application.exception.BusinessException;
 import java.time.LocalDateTime;
-import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -44,7 +43,8 @@ class DocVersionServiceTest {
   @BeforeEach
   void setUp() {
     versionService =
-        new DocVersionService(documentRepository, docVersionRepository, docVersionMapper, documentMapper);
+        new DocVersionService(
+            documentRepository, docVersionRepository, docVersionMapper, documentMapper);
   }
 
   @Test
@@ -92,20 +92,35 @@ class DocVersionServiceTest {
     doc.transitionTo(DocumentStateEnum.PUBLISHED);
 
     DocVersionEntity snapshot =
-        DocVersionEntity.createSnapshot(
-            1L, 100L, 1, "v1.0", "设计文档 v1.0", "最初的正确正文", "里程碑", 99L);
+        DocVersionEntity.createSnapshot(1L, 100L, 1, "v1.0", "设计文档 v1.0", "最初的正确正文", "里程碑", 99L);
     ReflectionTestUtils.setField(snapshot, "id", 501L);
 
     when(documentRepository.findById(100L)).thenReturn(Optional.of(doc));
     when(docVersionRepository.findByDocumentIdAndVersionNumber(100L, 1))
         .thenReturn(Optional.of(snapshot));
-    when(documentRepository.save(any(DocumentEntity.class)))
-        .thenAnswer(inv -> inv.getArgument(0));
+    when(documentRepository.save(any(DocumentEntity.class))).thenAnswer(inv -> inv.getArgument(0));
 
     DocumentDTO expectedDto =
         new DocumentDTO(
-            100L, 1L, 10L, "设计文档 v1.0", "摘要", "最初的正确正文", DocumentStateEnum.DRAFT,
-            WorkSpaceAclEnum.INTERNAL, DocSourceTypeEnum.MANUAL, null, 0, "v1.0-rollback", null, 6, 0, 0, 99L, LocalDateTime.now(), LocalDateTime.now());
+            100L,
+            1L,
+            10L,
+            "设计文档 v1.0",
+            "摘要",
+            "最初的正确正文",
+            DocumentStateEnum.DRAFT,
+            WorkSpaceAclEnum.INTERNAL,
+            DocSourceTypeEnum.MANUAL,
+            null,
+            0,
+            "v1.0-rollback",
+            null,
+            6,
+            0,
+            0,
+            99L,
+            LocalDateTime.now(),
+            LocalDateTime.now());
     when(documentMapper.toDTO(any(DocumentEntity.class))).thenReturn(expectedDto);
 
     // Act
@@ -130,7 +145,11 @@ class DocVersionServiceTest {
 
     assertThatThrownBy(() -> versionService.rollbackToVersion(100L, 999, 10L))
         .isInstanceOf(BusinessException.class)
-        .matches(ex -> ((BusinessException) ex).getCode().equals(ErrorCode.Document.DOC_VERSION_NOT_FOUND.getCode()));
+        .matches(
+            ex ->
+                ((BusinessException) ex)
+                    .getCode()
+                    .equals(ErrorCode.Document.DOC_VERSION_NOT_FOUND.getCode()));
   }
 
   @Test
@@ -142,11 +161,11 @@ class DocVersionServiceTest {
     ReflectionTestUtils.setField(doc, "id", 100L);
 
     DocVersionEntity v1 =
-        DocVersionEntity.createSnapshot(
-            1L, 100L, 1, "v1.0", "设计文档", "第一版旧正文", "初始发布", 99L);
+        DocVersionEntity.createSnapshot(1L, 100L, 1, "v1.0", "设计文档", "第一版旧正文", "初始发布", 99L);
 
     when(documentRepository.findById(100L)).thenReturn(Optional.of(doc));
-    when(docVersionRepository.findByDocumentIdAndVersionNumber(100L, 1)).thenReturn(Optional.of(v1));
+    when(docVersionRepository.findByDocumentIdAndVersionNumber(100L, 1))
+        .thenReturn(Optional.of(v1));
 
     // Act
     DocVersionCompareDTO compareResult = versionService.compareVersions(100L, 1, null);

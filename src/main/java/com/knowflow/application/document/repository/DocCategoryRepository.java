@@ -5,15 +5,14 @@ import com.knowflow.application.document.model.entity.DocCategoryEntity;
 import java.util.List;
 import org.springframework.stereotype.Repository;
 
-/**
- * 分类目录树仓储
- */
+/** 分类目录树仓储 */
 @Repository
 public interface DocCategoryRepository extends BaseRepository<DocCategoryEntity> {
 
   List<DocCategoryEntity> findByWorkSpaceIdOrderBySortOrderAsc(Long workSpaceId);
 
-  List<DocCategoryEntity> findByWorkSpaceIdAndParentIdOrderBySortOrderAsc(Long workSpaceId, Long parentId);
+  List<DocCategoryEntity> findByWorkSpaceIdAndParentIdOrderBySortOrderAsc(
+      Long workSpaceId, Long parentId);
 
   boolean existsByWorkSpaceIdAndParentIdAndName(Long workSpaceId, Long parentId, String name);
 

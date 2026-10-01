@@ -1,6 +1,5 @@
 package com.knowflow.application.document.category;
 
-import cn.hutool.core.util.StrUtil;
 import com.knowflow.application.common.ErrorCode;
 import com.knowflow.application.document.api.dto.DocCategoryDTO;
 import com.knowflow.application.document.api.dto.DocCategoryNodeDTO;
@@ -20,10 +19,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * 文档分类目录树领域服务
- * 负责分类多级树状维护、物化路径计算、防循环嵌套移动与树结构渲染
- */
+/** 文档分类目录树领域服务 负责分类多级树状维护、物化路径计算、防循环嵌套移动与树结构渲染 */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -33,18 +29,23 @@ public class DocCategoryService {
   private final DocumentRepository documentRepository;
   private final DocCategoryMapper docCategoryMapper;
 
-  /**
-   * 创建分类节点
-   */
+  /** 分类不存在的统一提示信息 */
+  private static final String MSG_CATEGORY_NOT_FOUND = "分类不存在";
+
+  /** 根节点物化路径 */
+  private static final String ROOT_PATH = "/0/";
+
+  /** 创建分类节点 */
   @Transactional
-  public DocCategoryDTO createCategory(Long workSpaceId, Long parentId, String name, Integer sortOrder) {
+  public DocCategoryDTO createCategory(
+      Long workSpaceId, Long parentId, String name, Integer sortOrder) {
     Long pid = (parentId == null || parentId < 0) ? 0L : parentId;
 
     if (docCategoryRepository.existsByWorkSpaceIdAndParentIdAndName(workSpaceId, pid, name)) {
       throw BusinessException.badRequest("当前层级下已存在同名分类: " + name);
     }
 
-    String parentPath = "/0/";
+    String parentPath = ROOT_PATH;
     int parentLevel = 0;
 
     if (pid > 0) {
@@ -71,30 +72,32 @@ public class DocCategoryService {
     return docCategoryMapper.toDTO(saved);
   }
 
-  /**
-   * 重命名或调整排序
-   */
+  /** 重命名或调整排序 */
   @Transactional
   public DocCategoryDTO updateCategory(Long categoryId, String newName, Integer newSortOrder) {
     DocCategoryEntity category =
         docCategoryRepository
             .findById(categoryId)
-            .orElseThrow(() -> new BusinessException(ErrorCode.Document.DOC_NOT_FOUND, "分类不存在"));
+            .orElseThrow(
+                () ->
+                    new BusinessException(
+                        ErrorCode.Document.DOC_NOT_FOUND, MSG_CATEGORY_NOT_FOUND));
 
     category.updateInfo(newName, newSortOrder);
     DocCategoryEntity saved = docCategoryRepository.save(category);
     return docCategoryMapper.toDTO(saved);
   }
 
-  /**
-   * 移动分类节点（防环检测与子树物化路径级联更新）
-   */
+  /** 移动分类节点（防环检测与子树物化路径级联更新） */
   @Transactional
   public DocCategoryDTO moveCategory(Long categoryId, Long newParentId) {
     DocCategoryEntity category =
         docCategoryRepository
             .findById(categoryId)
-            .orElseThrow(() -> new BusinessException(ErrorCode.Document.DOC_NOT_FOUND, "分类不存在"));
+            .orElseThrow(
+                () ->
+                    new BusinessException(
+                        ErrorCode.Document.DOC_NOT_FOUND, MSG_CATEGORY_NOT_FOUND));
 
     Long targetParentId = (newParentId == null || newParentId < 0) ? 0L : newParentId;
 
@@ -103,14 +106,15 @@ public class DocCategoryService {
     }
 
     String oldPath = category.getPath();
-    String newParentPath = "/0/";
+    String newParentPath = ROOT_PATH;
     int newLevel = 1;
 
     if (targetParentId > 0) {
       DocCategoryEntity newParent =
           docCategoryRepository
               .findById(targetParentId)
-              .orElseThrow(() -> new BusinessException(ErrorCode.Document.DOC_NOT_FOUND, "目标父分类不存在"));
+              .orElseThrow(
+                  () -> new BusinessException(ErrorCode.Document.DOC_NOT_FOUND, "目标父分类不存在"));
 
       // 防环：不能移动到自己现有的子节点下
       if (newParent.getPath().startsWith(oldPath)) {
@@ -128,13 +132,17 @@ public class DocCategoryService {
 
     // 级联刷新所有子节点的 path 和 level
     List<DocCategoryEntity> subTree =
-        docCategoryRepository.findByWorkSpaceIdAndPathStartingWith(category.getWorkSpaceId(), oldPath);
+        docCategoryRepository.findByWorkSpaceIdAndPathStartingWith(
+            category.getWorkSpaceId(), oldPath);
 
     int levelOffset = newLevel - (category.getLevel());
     for (DocCategoryEntity child : subTree) {
       if (!child.getId().equals(category.getId())) {
         String updatedChildPath = child.getPath().replaceFirst(oldPath, newPath);
-        child.move(child.getParentId(), StrUtil.subBefore(updatedChildPath, child.getId() + "/", false), child.getLevel() + levelOffset);
+        int idIndex = updatedChildPath.indexOf(child.getId() + "/");
+        String childParentPath =
+            idIndex >= 0 ? updatedChildPath.substring(0, idIndex) : updatedChildPath;
+        child.move(child.getParentId(), childParentPath, child.getLevel() + levelOffset);
         docCategoryRepository.save(child);
       }
     }
@@ -148,9 +156,7 @@ public class DocCategoryService {
     return docCategoryMapper.toDTO(saved);
   }
 
-  /**
-   * 删除分类
-   */
+  /** 删除分类 */
   @Transactional
   public void deleteCategory(Long categoryId) {
     DocCategoryEntity category =
@@ -176,9 +182,7 @@ public class DocCategoryService {
     log.info("【DocCategoryService】分类已删除: id={}", categoryId);
   }
 
-  /**
-   * 递归组装分类树（含各分类下文档统计）
-   */
+  /** 递归组装分类树（含各分类下文档统计） */
   @Transactional(readOnly = true)
   public List<DocCategoryNodeDTO> getCategoryTree(Long workSpaceId) {
     List<DocCategoryEntity> allCategories =
@@ -197,7 +201,8 @@ public class DocCategoryService {
 
   private List<DocCategoryNodeDTO> buildTreeNodes(
       Long currentParentId, Map<Long, List<DocCategoryEntity>> parentMap, Long workSpaceId) {
-    List<DocCategoryEntity> children = parentMap.getOrDefault(currentParentId, Collections.emptyList());
+    List<DocCategoryEntity> children =
+        parentMap.getOrDefault(currentParentId, Collections.emptyList());
     List<DocCategoryNodeDTO> result = new ArrayList<>();
 
     for (DocCategoryEntity cat : children) {

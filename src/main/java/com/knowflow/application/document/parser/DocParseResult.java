@@ -3,9 +3,7 @@ package com.knowflow.application.document.parser;
 import java.util.Collections;
 import java.util.Map;
 
-/**
- * 文档解析标准输出结果（不可变值对象）
- */
+/** 文档解析标准输出结果（不可变值对象） */
 public record DocParseResult(
     String markdownContent,
     String rawText,
@@ -14,8 +12,7 @@ public record DocParseResult(
     DocParserEngineEnum engineUsed,
     boolean isPreviewOnly,
     Map<String, Object> metadata,
-    String errorMessage
-) {
+    String errorMessage) {
 
   public DocParseResult {
     metadata = (metadata == null) ? Collections.emptyMap() : Collections.unmodifiableMap(metadata);

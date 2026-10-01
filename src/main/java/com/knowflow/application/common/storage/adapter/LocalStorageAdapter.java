@@ -14,6 +14,7 @@ import lombok.extern.slf4j.Slf4j;
 public class LocalStorageAdapter implements FileStorageGateway {
 
   private static final String UPLOAD_DIR = "uploads";
+  private static final String UPLOAD_URL_PREFIX = "/uploads/";
 
   @Override
   public String upload(
@@ -35,8 +36,8 @@ public class LocalStorageAdapter implements FileStorageGateway {
   public void delete(String objectKeyOrUrl) {
     try {
       String cleanKey = objectKeyOrUrl;
-      if (cleanKey.startsWith("/uploads/")) {
-        cleanKey = cleanKey.substring("/uploads/".length());
+      if (cleanKey.startsWith(UPLOAD_URL_PREFIX)) {
+        cleanKey = cleanKey.substring(UPLOAD_URL_PREFIX.length());
       }
       Path targetPath = Paths.get(UPLOAD_DIR, cleanKey);
       FileUtil.del(targetPath.toFile());
@@ -49,15 +50,15 @@ public class LocalStorageAdapter implements FileStorageGateway {
   @Override
   public String getUrl(String objectKey) {
     String cleanKey = objectKey.startsWith("/") ? objectKey.substring(1) : objectKey;
-    return "/uploads/" + cleanKey;
+    return UPLOAD_URL_PREFIX + cleanKey;
   }
 
   @Override
   public InputStream download(String objectKeyOrUrl) {
     try {
       String cleanKey = objectKeyOrUrl;
-      if (cleanKey.startsWith("/uploads/")) {
-        cleanKey = cleanKey.substring("/uploads/".length());
+      if (cleanKey.startsWith(UPLOAD_URL_PREFIX)) {
+        cleanKey = cleanKey.substring(UPLOAD_URL_PREFIX.length());
       }
       Path targetPath = Paths.get(UPLOAD_DIR, cleanKey);
       File file = targetPath.toFile();
@@ -76,8 +77,8 @@ public class LocalStorageAdapter implements FileStorageGateway {
   @Override
   public boolean exists(String objectKeyOrUrl) {
     String cleanKey = objectKeyOrUrl;
-    if (cleanKey.startsWith("/uploads/")) {
-      cleanKey = cleanKey.substring("/uploads/".length());
+    if (cleanKey.startsWith(UPLOAD_URL_PREFIX)) {
+      cleanKey = cleanKey.substring(UPLOAD_URL_PREFIX.length());
     }
     Path targetPath = Paths.get(UPLOAD_DIR, cleanKey);
     return targetPath.toFile().exists();

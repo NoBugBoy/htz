@@ -2,9 +2,7 @@ package com.knowflow.application.document.statemachine;
 
 import lombok.Getter;
 
-/**
- * 触发文档状态流转的领域事件
- */
+/** 触发文档状态流转的领域事件 */
 @Getter
 public enum DocumentEventEnum {
 

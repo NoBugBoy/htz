@@ -37,13 +37,15 @@ class DocCommentServiceTest {
 
   @BeforeEach
   void setUp() {
-    commentService = new DocCommentService(documentRepository, docCommentRepository, docCommentMapper);
+    commentService =
+        new DocCommentService(documentRepository, docCommentRepository, docCommentMapper);
   }
 
   @Test
   @DisplayName("发表根评论：成功创建并返回 DTO")
   void testAddRootCommentSuccess() {
-    DocumentEntity doc = DocumentEntity.createManual(1L, 0L, "文档", "摘要", "正文", WorkSpaceAclEnum.INTERNAL);
+    DocumentEntity doc =
+        DocumentEntity.createManual(1L, 0L, "文档", "摘要", "正文", WorkSpaceAclEnum.INTERNAL);
     ReflectionTestUtils.setField(doc, "id", 100L);
     when(documentRepository.findById(100L)).thenReturn(Optional.of(doc));
 

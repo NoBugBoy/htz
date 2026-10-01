@@ -8,9 +8,7 @@ import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.stereotype.Repository;
 
-/**
- * 文档核心聚合仓储
- */
+/** 文档核心聚合仓储 */
 @Repository
 public interface DocumentRepository
     extends BaseRepository<DocumentEntity>, JpaSpecificationExecutor<DocumentEntity> {
@@ -26,10 +24,12 @@ public interface DocumentRepository
   long countByWorkSpaceIdAndCategoryId(Long workSpaceId, Long categoryId);
 
   @org.springframework.data.jpa.repository.Modifying
-  @org.springframework.data.jpa.repository.Query("UPDATE DocumentEntity d SET d.readCount = d.readCount + 1 WHERE d.id = :id")
+  @org.springframework.data.jpa.repository.Query(
+      "UPDATE DocumentEntity d SET d.readCount = d.readCount + 1 WHERE d.id = :id")
   void incrementReadCount(@org.springframework.data.repository.query.Param("id") Long id);
 
   @org.springframework.data.jpa.repository.Modifying
-  @org.springframework.data.jpa.repository.Query("UPDATE DocumentEntity d SET d.likeCount = d.likeCount + 1 WHERE d.id = :id")
+  @org.springframework.data.jpa.repository.Query(
+      "UPDATE DocumentEntity d SET d.likeCount = d.likeCount + 1 WHERE d.id = :id")
   void incrementLikeCount(@org.springframework.data.repository.query.Param("id") Long id);
 }

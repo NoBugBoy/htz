@@ -4,9 +4,7 @@ import com.knowflow.application.document.api.dto.DocVersionDTO;
 import com.knowflow.application.document.model.entity.DocVersionEntity;
 import org.mapstruct.Mapper;
 
-/**
- * 版本快照 MapStruct 映射器
- */
+/** 版本快照 MapStruct 映射器 */
 @Mapper
 public interface DocVersionMapper {
 

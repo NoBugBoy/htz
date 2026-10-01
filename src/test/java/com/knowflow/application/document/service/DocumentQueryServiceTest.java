@@ -59,8 +59,25 @@ class DocumentQueryServiceTest {
 
     DocumentDTO mockDto =
         new DocumentDTO(
-            100L, 1L, 0L, "架构规范", "摘要", "正文", DocumentStateEnum.DRAFT, WorkSpaceAclEnum.INTERNAL,
-            DocSourceTypeEnum.MANUAL, null, 0, "v0.1-draft", null, 2, 0, 0, 10L, LocalDateTime.now(), LocalDateTime.now());
+            100L,
+            1L,
+            0L,
+            "架构规范",
+            "摘要",
+            "正文",
+            DocumentStateEnum.DRAFT,
+            WorkSpaceAclEnum.INTERNAL,
+            DocSourceTypeEnum.MANUAL,
+            null,
+            0,
+            "v0.1-draft",
+            null,
+            2,
+            0,
+            0,
+            10L,
+            LocalDateTime.now(),
+            LocalDateTime.now());
     when(documentMapper.toDTO(any(DocumentEntity.class))).thenReturn(mockDto);
 
     Optional<DocumentDTO> result = queryService.getById(100L, 10L);
@@ -84,8 +101,25 @@ class DocumentQueryServiceTest {
 
     DocumentDTO mockDto =
         new DocumentDTO(
-            100L, 1L, 0L, "架构规范", "摘要", "正文", DocumentStateEnum.DRAFT, WorkSpaceAclEnum.INTERNAL,
-            DocSourceTypeEnum.MANUAL, null, 0, "v0.1-draft", null, 2, 0, 0, 10L, LocalDateTime.now(), LocalDateTime.now());
+            100L,
+            1L,
+            0L,
+            "架构规范",
+            "摘要",
+            "正文",
+            DocumentStateEnum.DRAFT,
+            WorkSpaceAclEnum.INTERNAL,
+            DocSourceTypeEnum.MANUAL,
+            null,
+            0,
+            "v0.1-draft",
+            null,
+            2,
+            0,
+            0,
+            10L,
+            LocalDateTime.now(),
+            LocalDateTime.now());
     when(documentMapper.toDTO(any(DocumentEntity.class))).thenReturn(mockDto);
 
     DocumentPageRequest req = new DocumentPageRequest(1L, null, null, "架构", 0, 10);
@@ -106,8 +140,25 @@ class DocumentQueryServiceTest {
 
     DocumentDTO mockDto =
         new DocumentDTO(
-            102L, 1L, 5L, "分类文档", "摘要", "正文", DocumentStateEnum.DRAFT, WorkSpaceAclEnum.INTERNAL,
-            DocSourceTypeEnum.MANUAL, null, 0, "v0.1-draft", null, 4, 0, 0, 10L, LocalDateTime.now(), LocalDateTime.now());
+            102L,
+            1L,
+            5L,
+            "分类文档",
+            "摘要",
+            "正文",
+            DocumentStateEnum.DRAFT,
+            WorkSpaceAclEnum.INTERNAL,
+            DocSourceTypeEnum.MANUAL,
+            null,
+            0,
+            "v0.1-draft",
+            null,
+            4,
+            0,
+            0,
+            10L,
+            LocalDateTime.now(),
+            LocalDateTime.now());
     when(documentMapper.toDTOList(any())).thenReturn(List.of(mockDto));
 
     List<DocumentDTO> list = queryService.listByCategory(1L, 5L, 10L);

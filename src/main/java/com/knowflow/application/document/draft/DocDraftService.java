@@ -1,21 +1,17 @@
 package com.knowflow.application.document.draft;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.knowflow.application.document.model.entity.DocumentEntity;
 import com.knowflow.application.document.repository.DocumentRepository;
 import java.time.Duration;
 import java.time.LocalDateTime;
-import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 /**
- * Redis 协同草稿自动保存与暂存恢复服务
- * 1. 提供前端防抖自动上报暂存通道 (Key: kf:doc:draft:{workspaceId}:{documentId}:{userId})；
- * 2. 7天滑动过期时间保护；
- * 3. 重新进入编辑器时检测暂存时间是否晚于 DB updateTime，提示用户快速一键恢复。
+ * Redis 协同草稿自动保存与暂存恢复服务 1. 提供前端防抖自动上报暂存通道 (Key: kf:doc:draft:{workspaceId}:{documentId}:{userId})；
+ * 2. 7天滑动过期时间保护； 3. 重新进入编辑器时检测暂存时间是否晚于 DB updateTime，提示用户快速一键恢复。
  */
 @Slf4j
 @Service
@@ -29,11 +25,12 @@ public class DocDraftService {
   private final DocumentRepository documentRepository;
   private final ObjectMapper objectMapper;
 
-  /**
-   * 保存/刷新协同草稿暂存
-   */
+  /** 保存/刷新协同草稿暂存 */
   public void saveDraft(DocDraftDTO draft) {
-    if (draft == null || draft.workSpaceId() == null || draft.documentId() == null || draft.userId() == null) {
+    if (draft == null
+        || draft.workSpaceId() == null
+        || draft.documentId() == null
+        || draft.userId() == null) {
       log.warn("【DocDraftService】忽略非法草稿暂存请求: draft={}", draft);
       return;
     }
@@ -48,9 +45,7 @@ public class DocDraftService {
     }
   }
 
-  /**
-   * 获取并校验草稿暂存状态
-   */
+  /** 获取并校验草稿暂存状态 */
   public DocDraftStatusDTO getDraftStatus(Long workSpaceId, Long documentId, Long userId) {
     String key = buildDraftKey(workSpaceId, documentId, userId);
     try {
@@ -62,15 +57,18 @@ public class DocDraftService {
       DocDraftDTO draft = objectMapper.readValue(json, DocDraftDTO.class);
 
       // 查询数据库主文档对比最后更新时间
-      boolean newerThanDatabase = documentRepository.findById(documentId)
-          .map(doc -> {
-            LocalDateTime dbUpdateTime = doc.getUpdateTime();
-            if (dbUpdateTime != null && draft.savedAt() != null) {
-              return draft.savedAt().isAfter(dbUpdateTime);
-            }
-            return true;
-          })
-          .orElse(true);
+      boolean newerThanDatabase =
+          documentRepository
+              .findById(documentId)
+              .map(
+                  doc -> {
+                    LocalDateTime dbUpdateTime = doc.getUpdateTime();
+                    if (dbUpdateTime != null && draft.savedAt() != null) {
+                      return draft.savedAt().isAfter(dbUpdateTime);
+                    }
+                    return true;
+                  })
+              .orElse(true);
 
       return DocDraftStatusDTO.of(newerThanDatabase, draft);
     } catch (Exception e) {
@@ -79,9 +77,7 @@ public class DocDraftService {
     }
   }
 
-  /**
-   * 清除草稿暂存 (用户正式提交发布或主动废弃暂存时调用)
-   */
+  /** 清除草稿暂存 (用户正式提交发布或主动废弃暂存时调用) */
   public void clearDraft(Long workSpaceId, Long documentId, Long userId) {
     String key = buildDraftKey(workSpaceId, documentId, userId);
     try {

@@ -6,9 +6,7 @@ import java.util.Map;
 import java.util.Objects;
 import org.springframework.util.StringUtils;
 
-/**
- * 文档解析通用命令对象（不可变参数对象）
- */
+/** 文档解析通用命令对象（不可变参数对象） */
 public record DocParseCommand(
     InputStream contentStream,
     String storagePath,
@@ -16,8 +14,7 @@ public record DocParseCommand(
     String fileExtension,
     String mimeType,
     DocParserEngineEnum preferredEngine,
-    Map<String, Object> extraOptions
-) {
+    Map<String, Object> extraOptions) {
 
   public DocParseCommand {
     if (!StringUtils.hasText(fileExtension) && StringUtils.hasText(fileName)) {
@@ -27,7 +24,8 @@ public record DocParseCommand(
       fileExtension = fileExtension.toLowerCase().replace(".", "");
     }
     preferredEngine = (preferredEngine == null) ? DocParserEngineEnum.AUTO : preferredEngine;
-    extraOptions = (extraOptions == null) ? Collections.emptyMap() : Collections.unmodifiableMap(extraOptions);
+    extraOptions =
+        (extraOptions == null) ? Collections.emptyMap() : Collections.unmodifiableMap(extraOptions);
   }
 
   public static DocParseCommand ofStream(

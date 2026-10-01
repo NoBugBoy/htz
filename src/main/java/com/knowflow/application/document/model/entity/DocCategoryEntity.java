@@ -1,6 +1,6 @@
 package com.knowflow.application.document.model.entity;
 
-import cn.hutool.core.util.StrUtil;
+import cn.hutool.core.text.CharSequenceUtil;
 import com.knowflow.application.common.BaseEntity;
 import com.knowflow.application.exception.BusinessException;
 import jakarta.persistence.Column;
@@ -28,6 +28,9 @@ import lombok.NoArgsConstructor;
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class DocCategoryEntity extends BaseEntity {
+
+/** 物化路径分隔符 */
+private static final String PATH_DELIMITER = "/";
 
   /** 所属团队空间 ID */
   @Column(name = "work_space_id", nullable = false)
@@ -59,13 +62,13 @@ public class DocCategoryEntity extends BaseEntity {
   public static DocCategoryEntity create(
       Long workSpaceId, Long parentId, String name, Integer sortOrder, String parentPath, Integer parentLevel) {
     Objects.requireNonNull(workSpaceId, "所属工作区不能为空");
-    if (StrUtil.isBlank(name)) {
+    if (CharSequenceUtil.isBlank(name)) {
       throw BusinessException.badRequest("分类名称不能为空");
     }
 
     Long pid = (parentId == null || parentId < 0) ? 0L : parentId;
     int lvl = (parentLevel == null || parentLevel < 0) ? 1 : parentLevel + 1;
-    String pPath = StrUtil.isNotBlank(parentPath) ? parentPath : "/0/";
+    String pPath = CharSequenceUtil.isNotBlank(parentPath) ? parentPath : "/0/";
 
     DocCategoryEntity entity = new DocCategoryEntity();
     entity.workSpaceId = workSpaceId;
@@ -74,7 +77,7 @@ public class DocCategoryEntity extends BaseEntity {
     entity.sortOrder = (sortOrder == null) ? 0 : sortOrder;
     entity.level = lvl;
     // 自身 path 在保存获取 ID 后追加，初始保留父级 path 前缀
-    entity.path = pPath.endsWith("/") ? pPath : pPath + "/";
+    entity.path = pPath.endsWith(PATH_DELIMITER) ? pPath : pPath + PATH_DELIMITER;
     return entity;
   }
 
@@ -83,7 +86,7 @@ public class DocCategoryEntity extends BaseEntity {
    */
   public void refreshSelfPath() {
     if (getId() != null && !this.path.endsWith("/" + getId() + "/")) {
-      this.path = this.path + getId() + "/";
+      if (getId() != null && !this.path.endsWith(PATH_DELIMITER + getId() + PATH_DELIMITER)) {
     }
   }
 
@@ -91,7 +94,7 @@ public class DocCategoryEntity extends BaseEntity {
    * 更新名称与排序
    */
   public void updateInfo(String newName, Integer newSortOrder) {
-    if (StrUtil.isNotBlank(newName)) {
+    if (CharSequenceUtil.isNotBlank(newName)) {
       this.name = newName.trim();
     }
     if (newSortOrder != null) {
@@ -105,7 +108,9 @@ public class DocCategoryEntity extends BaseEntity {
   public void move(Long newParentId, String newParentPath, int newLevel) {
     this.parentId = (newParentId == null || newParentId < 0) ? 0L : newParentId;
     this.level = newLevel;
-    String pPath = StrUtil.isNotBlank(newParentPath) ? newParentPath : "/0/";
-    this.path = (pPath.endsWith("/") ? pPath : pPath + "/") + (getId() != null ? getId() + "/" : "");
+    String pPath = CharSequenceUtil.isNotBlank(newParentPath) ? newParentPath : "/0/";
+    this.path =
+    (pPath.endsWith(PATH_DELIMITER) ? pPath : pPath + PATH_DELIMITER)
+    + (getId() != null ? getId() + PATH_DELIMITER : "");
   }
 }

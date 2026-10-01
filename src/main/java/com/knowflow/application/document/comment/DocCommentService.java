@@ -19,10 +19,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * 文档协同评论用例服务
- * 支持根评论发表、楼中楼嵌套回复、点赞、权限删除与递归树渲染
- */
+/** 文档协同评论用例服务 支持根评论发表、楼中楼嵌套回复、点赞、权限删除与递归树渲染 */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -32,29 +29,36 @@ public class DocCommentService {
   private final DocCommentRepository docCommentRepository;
   private final DocCommentMapper docCommentMapper;
 
-  /**
-   * 发表根评论
-   */
+  /** 发表根评论 */
   @Transactional
-  public DocCommentDTO addRootComment(Long workSpaceId, Long documentId, Long userId, String content) {
+  public DocCommentDTO addRootComment(
+      Long workSpaceId, Long documentId, Long userId, String content) {
     DocumentEntity doc =
         documentRepository
             .findById(documentId)
             .orElseThrow(() -> new BusinessException(ErrorCode.Document.DOC_NOT_FOUND, "目标文档不存在"));
 
-    DocCommentEntity comment = DocCommentEntity.createRoot(doc.getWorkSpaceId(), doc.getId(), userId, content);
+    DocCommentEntity comment =
+        DocCommentEntity.createRoot(doc.getWorkSpaceId(), doc.getId(), userId, content);
     DocCommentEntity saved = docCommentRepository.save(comment);
 
-    log.info("【DocCommentService】根评论发表成功: commentId={}, docId={}, userId={}", saved.getId(), doc.getId(), userId);
+    log.info(
+        "【DocCommentService】根评论发表成功: commentId={}, docId={}, userId={}",
+        saved.getId(),
+        doc.getId(),
+        userId);
     return docCommentMapper.toDTO(saved);
   }
 
-  /**
-   * 发表楼中楼回复
-   */
+  /** 发表楼中楼回复 */
   @Transactional
   public DocCommentDTO addReplyComment(
-      Long workSpaceId, Long documentId, Long userId, Long parentId, Long replyToUserId, String content) {
+      Long workSpaceId,
+      Long documentId,
+      Long userId,
+      Long parentId,
+      Long replyToUserId,
+      String content) {
     DocumentEntity doc =
         documentRepository
             .findById(documentId)
@@ -67,7 +71,12 @@ public class DocCommentService {
 
     DocCommentEntity reply =
         DocCommentEntity.createReply(
-            doc.getWorkSpaceId(), doc.getId(), userId, parentComment.getId(), replyToUserId, content);
+            doc.getWorkSpaceId(),
+            doc.getId(),
+            userId,
+            parentComment.getId(),
+            replyToUserId,
+            content);
     DocCommentEntity saved = docCommentRepository.save(reply);
 
     log.info(
@@ -80,9 +89,7 @@ public class DocCommentService {
     return docCommentMapper.toDTO(saved);
   }
 
-  /**
-   * 点赞评论
-   */
+  /** 点赞评论 */
   @Transactional
   public void likeComment(Long commentId) {
     DocCommentEntity comment =
@@ -93,9 +100,7 @@ public class DocCommentService {
     docCommentRepository.save(comment);
   }
 
-  /**
-   * 删除评论
-   */
+  /** 删除评论 */
   @Transactional
   public void deleteComment(Long commentId, Long currentUserId) {
     DocCommentEntity comment =
@@ -111,9 +116,7 @@ public class DocCommentService {
     log.info("【DocCommentService】评论已删除: commentId={}, userId={}", commentId, currentUserId);
   }
 
-  /**
-   * 查询文档全部评论树（树形结构）
-   */
+  /** 查询文档全部评论树（树形结构） */
   @Transactional(readOnly = true)
   public List<DocCommentNodeDTO> getCommentTree(Long documentId) {
     List<DocCommentEntity> allComments =
@@ -131,7 +134,8 @@ public class DocCommentService {
 
   private List<DocCommentNodeDTO> buildCommentTreeNodes(
       Long currentParentId, Map<Long, List<DocCommentEntity>> parentMap) {
-    List<DocCommentEntity> children = parentMap.getOrDefault(currentParentId, Collections.emptyList());
+    List<DocCommentEntity> children =
+        parentMap.getOrDefault(currentParentId, Collections.emptyList());
     List<DocCommentNodeDTO> result = new ArrayList<>();
 
     for (DocCommentEntity comment : children) {

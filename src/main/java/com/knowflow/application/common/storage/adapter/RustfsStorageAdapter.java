@@ -1,7 +1,7 @@
 package com.knowflow.application.common.storage.adapter;
 
 import cn.hutool.core.io.FileUtil;
-import cn.hutool.core.util.StrUtil;
+import cn.hutool.core.text.CharSequenceUtil;
 import com.knowflow.application.common.storage.FileStorageGateway;
 import com.knowflow.application.common.storage.RustfsStorageProperties;
 import com.knowflow.application.exception.BusinessException;
@@ -11,11 +11,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import lombok.extern.slf4j.Slf4j;
 
-/**
- * rustfs 对象存储适配器
- * 对接基于 Rust 编写的 S3 兼容高性能分布式对象存储系统 (rustfs)
- * 提供文件落盘、原文件溯源访问以及本地工作区隔离
- */
+/** rustfs 对象存储适配器 对接基于 Rust 编写的 S3 兼容高性能分布式对象存储系统 (rustfs) 提供文件落盘、原文件溯源访问以及本地工作区隔离 */
 @Slf4j
 public class RustfsStorageAdapter implements FileStorageGateway {
 
@@ -36,7 +32,6 @@ public class RustfsStorageAdapter implements FileStorageGateway {
   public String upload(
       String objectKey, InputStream inputStream, String contentType, long contentLength) {
     try {
-      // 统一构建路径: rustfs-data/{bucket}/{objectKey}
       Path targetPath = Paths.get(RUSTFS_LOCAL_DATA, properties.getBucketName(), objectKey);
       File file = targetPath.toFile();
       FileUtil.mkdir(file.getParentFile());
@@ -48,8 +43,7 @@ public class RustfsStorageAdapter implements FileStorageGateway {
           contentLength);
       return getUrl(objectKey);
     } catch (Exception e) {
-      log.error(
-          "rustfs 存储文件保存失败: objectKey={}, error={}", objectKey, e.getMessage(), e);
+      log.error("rustfs 存储文件保存失败: objectKey={}, error={}", objectKey, e.getMessage(), e);
       throw BusinessException.badRequest("rustfs 文件存储失败，请稍后重试");
     }
   }
@@ -69,8 +63,11 @@ public class RustfsStorageAdapter implements FileStorageGateway {
   @Override
   public String getUrl(String objectKey) {
     String cleanKey = objectKey.startsWith("/") ? objectKey.substring(1) : objectKey;
-    if (StrUtil.isNotBlank(properties.getEndpoint())) {
-      String endpoint = properties.getEndpoint().replaceAll("/+$", "");
+    if (CharSequenceUtil.isNotBlank(properties.getEndpoint())) {
+      String endpoint = properties.getEndpoint();
+      while (endpoint.endsWith("/")) {
+        endpoint = endpoint.substring(0, endpoint.length() - 1);
+      }
       return endpoint + "/" + properties.getBucketName() + "/" + cleanKey;
     }
     return "/rustfs/" + properties.getBucketName() + "/" + cleanKey;
@@ -103,7 +100,7 @@ public class RustfsStorageAdapter implements FileStorageGateway {
   }
 
   private String cleanKey(String objectKeyOrUrl) {
-    if (StrUtil.isBlank(objectKeyOrUrl)) {
+    if (CharSequenceUtil.isBlank(objectKeyOrUrl)) {
       return "";
     }
     String clean = objectKeyOrUrl;

@@ -1,18 +1,17 @@
 package com.knowflow.application.document.pipeline;
 
 import cn.hutool.core.io.IoUtil;
-import cn.hutool.core.util.StrUtil;
+import cn.hutool.core.text.CharSequenceUtil;
 import com.knowflow.application.document.parser.DocParserEngineEnum;
 import com.knowflow.application.enums.WorkSpaceAclEnum;
 import com.knowflow.application.exception.BusinessException;
 import java.io.InputStream;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Objects;
 
-/**
- * 文档导入命令参数对象（不可变 Java Record）
- */
+/** 文档导入命令参数对象（不可变 Java Record） */
 public record DocumentImportCommand(
     Long workSpaceId,
     Long categoryId,
@@ -22,12 +21,11 @@ public record DocumentImportCommand(
     DocParserEngineEnum preferredEngine,
     boolean extractPdfToDoc,
     WorkSpaceAclEnum visibility,
-    Map<String, Object> extraOptions
-) {
+    Map<String, Object> extraOptions) {
 
   public DocumentImportCommand {
     Objects.requireNonNull(workSpaceId, "工作区ID不能为空");
-    if (StrUtil.isBlank(originalFileName)) {
+    if (CharSequenceUtil.isBlank(originalFileName)) {
       throw BusinessException.badRequest("原始文件名不能为空");
     }
     if (fileBytes == null || fileBytes.length == 0) {
@@ -36,12 +34,11 @@ public record DocumentImportCommand(
     categoryId = (categoryId == null) ? 0L : categoryId;
     preferredEngine = (preferredEngine == null) ? DocParserEngineEnum.AUTO : preferredEngine;
     visibility = (visibility == null) ? WorkSpaceAclEnum.INTERNAL : visibility;
-    extraOptions = (extraOptions == null) ? Collections.emptyMap() : Collections.unmodifiableMap(extraOptions);
+    extraOptions =
+        (extraOptions == null) ? Collections.emptyMap() : Collections.unmodifiableMap(extraOptions);
   }
 
-  /**
-   * 快捷工厂：通过字节数组构建
-   */
+  /** 快捷工厂：通过字节数组构建 */
   public static DocumentImportCommand ofBytes(
       Long workSpaceId,
       Long categoryId,
@@ -60,9 +57,7 @@ public record DocumentImportCommand(
         Collections.emptyMap());
   }
 
-  /**
-   * 快捷工厂：通过输入流构建
-   */
+  /** 快捷工厂：通过输入流构建 */
   public static DocumentImportCommand ofStream(
       Long workSpaceId,
       Long categoryId,
@@ -74,18 +69,72 @@ public record DocumentImportCommand(
     return ofBytes(workSpaceId, categoryId, originalFileName, bytes, contentType);
   }
 
-  /**
-   * 提取文件扩展名
-   */
+  /** 提取文件扩展名 */
   public String fileExtension() {
     int idx = originalFileName.lastIndexOf('.');
     return (idx >= 0) ? originalFileName.substring(idx + 1).toLowerCase() : "";
   }
 
-  /**
-   * 获取文件大小
-   */
+  /** 获取文件大小 */
   public long fileSize() {
     return fileBytes != null ? fileBytes.length : 0L;
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (!(o instanceof DocumentImportCommand other)) {
+      return false;
+    }
+    return extractPdfToDoc == other.extractPdfToDoc
+        && Objects.equals(workSpaceId, other.workSpaceId)
+        && Objects.equals(categoryId, other.categoryId)
+        && Objects.equals(originalFileName, other.originalFileName)
+        && Arrays.equals(fileBytes, other.fileBytes)
+        && Objects.equals(contentType, other.contentType)
+        && Objects.equals(preferredEngine, other.preferredEngine)
+        && Objects.equals(visibility, other.visibility)
+        && Objects.equals(extraOptions, other.extraOptions);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(
+        workSpaceId,
+        categoryId,
+        originalFileName,
+        Arrays.hashCode(fileBytes),
+        contentType,
+        preferredEngine,
+        extractPdfToDoc,
+        visibility,
+        extraOptions);
+  }
+
+  @Override
+  public String toString() {
+    return "DocumentImportCommand{workSpaceId="
+        + workSpaceId
+        + ", categoryId="
+        + categoryId
+        + ", originalFileName='"
+        + originalFileName
+        + '\''
+        + ", fileBytes="
+        + Arrays.toString(fileBytes)
+        + ", contentType='"
+        + contentType
+        + '\''
+        + ", preferredEngine="
+        + preferredEngine
+        + ", extractPdfToDoc="
+        + extractPdfToDoc
+        + ", visibility="
+        + visibility
+        + ", extraOptions="
+        + extraOptions
+        + '}';
   }
 }

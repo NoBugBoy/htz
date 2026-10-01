@@ -5,9 +5,7 @@ import com.knowflow.application.document.parser.DocParserEngineEnum;
 import java.util.Collections;
 import java.util.Map;
 
-/**
- * 文档导入执行结果（不可变 Java Record）
- */
+/** 文档导入执行结果（不可变 Java Record） */
 public record DocumentImportResult(
     Long documentId,
     Long sourceFileId,
@@ -19,8 +17,7 @@ public record DocumentImportResult(
     DocParserEngineEnum engineUsed,
     boolean instantUpload,
     String previewOrMarkdownContent,
-    Map<String, Object> metadata
-) {
+    Map<String, Object> metadata) {
 
   public DocumentImportResult {
     metadata = (metadata == null) ? Collections.emptyMap() : Collections.unmodifiableMap(metadata);
@@ -98,7 +95,8 @@ public record DocumentImportResult(
   }
 
   public boolean isSuccess() {
-    return this.parseStatus == DocParseStatusEnum.SUCCESS || this.parseStatus == DocParseStatusEnum.PREVIEW_ONLY;
+    return this.parseStatus == DocParseStatusEnum.SUCCESS
+        || this.parseStatus == DocParseStatusEnum.PREVIEW_ONLY;
   }
 
   public String suggestedTitle() {

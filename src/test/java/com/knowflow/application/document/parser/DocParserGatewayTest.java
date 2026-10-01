@@ -26,7 +26,9 @@ class DocParserGatewayTest {
     MarkItDownDocParserEngine markItDownEngine = new MarkItDownDocParserEngine(mockEngine);
     MinerUDocParserEngine minerUEngine = new MinerUDocParserEngine(mockEngine);
 
-    gateway = new DefaultDocParserGateway(List.of(mockEngine, markItDownEngine, minerUEngine), mockEngine);
+    gateway =
+        new DefaultDocParserGateway(
+            List.of(mockEngine, markItDownEngine, minerUEngine), mockEngine);
   }
 
   @Test
@@ -65,8 +67,7 @@ class DocParserGatewayTest {
   @DisplayName("解析 PDF 文件：默认双轨制为仅只读附件预览")
   void testParsePdfDefaultPreviewOnly() {
     ByteArrayInputStream stream = new ByteArrayInputStream("fake pdf".getBytes());
-    DocParseCommand command =
-        DocParseCommand.ofStream(stream, "论文.pdf", DocParserEngineEnum.AUTO);
+    DocParseCommand command = DocParseCommand.ofStream(stream, "论文.pdf", DocParserEngineEnum.AUTO);
 
     DocParseResult result = gateway.parse(command);
 
@@ -81,7 +82,12 @@ class DocParserGatewayTest {
     ByteArrayInputStream stream = new ByteArrayInputStream("fake pdf".getBytes());
     DocParseCommand command =
         DocParseCommand.of(
-            stream, null, "论文.pdf", "application/pdf", DocParserEngineEnum.AUTO, Map.of("ocr", true));
+            stream,
+            null,
+            "论文.pdf",
+            "application/pdf",
+            DocParserEngineEnum.AUTO,
+            Map.of("ocr", true));
 
     DocParseResult result = gateway.parse(command);
 

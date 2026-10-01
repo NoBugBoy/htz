@@ -4,10 +4,7 @@ import com.knowflow.application.document.parser.DocParseStatusEnum;
 import com.knowflow.application.document.parser.DocParserEngineEnum;
 import java.time.LocalDateTime;
 
-/**
- * 来源原始文件资产数据传输对象 (不可变 record)
- * 仅暴露安全公开信息与访问链接，隔离内部存储架构路径细节
- */
+/** 来源原始文件资产数据传输对象 (不可变 record) 仅暴露安全公开信息与访问链接，隔离内部存储架构路径细节 */
 public record DocSourceFileDTO(
     Long id,
     Long workSpaceId,
@@ -22,5 +19,4 @@ public record DocSourceFileDTO(
     DocParserEngineEnum parseEngine,
     String rawText,
     String errorMessage,
-    LocalDateTime createTime
-) {}
+    LocalDateTime createTime) {}

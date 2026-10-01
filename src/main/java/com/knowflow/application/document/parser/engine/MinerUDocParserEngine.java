@@ -1,6 +1,6 @@
 package com.knowflow.application.document.parser.engine;
 
-import cn.hutool.core.util.StrUtil;
+import cn.hutool.core.text.CharSequenceUtil;
 import com.knowflow.application.document.parser.DocParseCommand;
 import com.knowflow.application.document.parser.DocParseResult;
 import com.knowflow.application.document.parser.DocParserEngine;
@@ -11,11 +11,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
-/**
- * OpenDataLab MinerU 解析引擎（预留适配器）
- * 面向高精度学术 PDF、复杂排版文档及复杂表格提取
- * 后续可无缝切换接入 MinerU 官方开源模型服务或云端 API
- */
+/** OpenDataLab MinerU 解析引擎（预留适配器） 面向高精度学术 PDF、复杂排版文档及复杂表格提取 后续可无缝切换接入 MinerU 官方开源模型服务或云端 API */
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -29,8 +25,7 @@ public class MinerUDocParserEngine implements DocParserEngine {
   @Value("${knowflow.parser.mineru.api-key:}")
   private String mineruApiKey;
 
-  private static final Set<String> SUPPORTED_EXTS =
-      Set.of("pdf", "doc", "docx", "ppt", "pptx");
+  private static final Set<String> SUPPORTED_EXTS = Set.of("pdf", "doc", "docx", "ppt", "pptx");
 
   @Override
   public DocParserEngineEnum getEngineType() {
@@ -39,14 +34,14 @@ public class MinerUDocParserEngine implements DocParserEngine {
 
   @Override
   public boolean supports(String fileExtension) {
-    return StrUtil.isNotBlank(fileExtension) && SUPPORTED_EXTS.contains(fileExtension.toLowerCase());
+    return CharSequenceUtil.isNotBlank(fileExtension)
+        && SUPPORTED_EXTS.contains(fileExtension.toLowerCase());
   }
 
   @Override
   public DocParseResult parse(DocParseCommand command) {
-    if (StrUtil.isBlank(mineruEndpoint)) {
-      log.info(
-          "【MinerU】未配置 MinerU API 端点 (knowflow.parser.mineru.endpoint)，平滑委托至 Mock 引擎处理");
+    if (CharSequenceUtil.isBlank(mineruEndpoint)) {
+      log.info("【MinerU】未配置 MinerU API 端点 (knowflow.parser.mineru.endpoint)，平滑委托至 Mock 引擎处理");
       return mockFallback.parse(command);
     }
 
