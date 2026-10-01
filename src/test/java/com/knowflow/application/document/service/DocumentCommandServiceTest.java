@@ -39,6 +39,7 @@ class DocumentCommandServiceTest {
   @Mock private DocumentStateMachineEngine stateMachineEngine;
   @Mock private DocumentImportPipeline importPipeline;
   @Mock private DocumentMapper documentMapper;
+  @Mock private org.springframework.context.ApplicationEventPublisher eventPublisher;
 
   private DocumentCommandService commandService;
 
@@ -50,7 +51,8 @@ class DocumentCommandServiceTest {
             docAccessControlService,
             stateMachineEngine,
             importPipeline,
-            documentMapper);
+            documentMapper,
+            eventPublisher);
   }
 
   @Test
@@ -145,5 +147,20 @@ class DocumentCommandServiceTest {
 
     verify(stateMachineEngine).fire(eq(DocumentStateEnum.PENDING_REVIEW), eq(DocumentEventEnum.APPROVE), any(DocumentStateContext.class));
     verify(documentRepository).save(doc);
+  }
+
+  @Test
+  @DisplayName("删除文档：校验权限并删除，同时发布 DocumentDeletedEvent 领域事件")
+  void testDeleteDocumentSuccess() {
+    DocumentEntity doc =
+        DocumentEntity.createManual(1L, 0L, "即将删除文档", "摘要", "内容", WorkSpaceAclEnum.INTERNAL);
+    ReflectionTestUtils.setField(doc, "id", 100L);
+    when(documentRepository.findById(100L)).thenReturn(Optional.of(doc));
+
+    commandService.delete(100L, 10L);
+
+    verify(docAccessControlService).assertCanWrite(doc, 10L);
+    verify(documentRepository).delete(doc);
+    verify(eventPublisher).publishEvent(any(com.knowflow.application.document.model.event.DocumentDeletedEvent.class));
   }
 }

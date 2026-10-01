@@ -65,6 +65,21 @@ public class DocumentSearchSyncListener {
   }
 
   /**
+   * 监听文档删除领域事件，在事务提交后从 ES 检索索引中彻底移除该文档
+   *
+   * @param event 文档删除事件
+   */
+  @Async
+  @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
+  public void onDocumentDeleted(com.knowflow.application.document.model.event.DocumentDeletedEvent event) {
+    if (event == null || event.documentId() == null) {
+      return;
+    }
+    log.info("收到文档删除事件，准备从 ES 索引移除: documentId={}", event.documentId());
+    removeFromIndex(event.documentId());
+  }
+
+  /**
    * 同步文档至 Elasticsearch 核心索引
    *
    * @param documentId 文档主键 ID

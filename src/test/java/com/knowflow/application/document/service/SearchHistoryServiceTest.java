@@ -4,15 +4,16 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyDouble;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-
-import static org.mockito.Mockito.lenient;
 
 import com.knowflow.application.document.search.dto.SearchHistoryRecordEvent;
 import com.knowflow.application.document.service.impl.SearchHistoryServiceImpl;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -37,12 +38,11 @@ class SearchHistoryServiceTest {
 
   @BeforeEach
   void setUp() {
-    // lenient: testClearHistory 直接调 delete() 不走 opsForZSet，避免 UnnecessaryStubbing
     lenient().when(stringRedisTemplate.opsForZSet()).thenReturn(zSetOperations);
   }
 
   @Test
-  @DisplayName("记录搜索历史：写入 Redis ZSet 并自动淘汰超 20 条记录，同时发布归档事件")
+  @DisplayName("记录搜索历史：按工作区隔离写入 Redis ZSet 并设置 30 天 TTL，同时发布归档事件")
   void testRecordHistory() {
     Long userId = 1001L;
     Long workspaceId = 1L;
@@ -50,8 +50,10 @@ class SearchHistoryServiceTest {
 
     searchHistoryService.record(userId, workspaceId, keyword);
 
-    verify(zSetOperations).add(eq("kf:search:history:1001"), eq("Elasticsearch 8"), anyDouble());
-    verify(zSetOperations).removeRange("kf:search:history:1001", 0, -21);
+    String expectedKey = "kf:search:history:1:1001";
+    verify(zSetOperations).add(eq(expectedKey), eq("Elasticsearch 8"), anyDouble());
+    verify(zSetOperations).removeRange(expectedKey, 0, -21);
+    verify(stringRedisTemplate).expire(expectedKey, 30L, TimeUnit.DAYS);
 
     ArgumentCaptor<SearchHistoryRecordEvent> eventCaptor =
         ArgumentCaptor.forClass(SearchHistoryRecordEvent.class);
@@ -65,32 +67,56 @@ class SearchHistoryServiceTest {
   }
 
   @Test
-  @DisplayName("获取搜索历史：倒序读取最近条数")
+  @DisplayName("M2 容错保证：Redis 写入异常时仍可靠发布 DB 归档事件")
+  void testRecordHistory_RedisFailureStillPublishesEvent() {
+    Long userId = 1001L;
+    Long workspaceId = 1L;
+    String keyword = "Fault Tolerance";
+    String expectedKey = "kf:search:history:1:1001";
+
+    when(zSetOperations.add(eq(expectedKey), eq("Fault Tolerance"), anyDouble()))
+        .thenThrow(new RuntimeException("Redis connection timeout"));
+
+    // 执行不会向外抛异常
+    searchHistoryService.record(userId, workspaceId, keyword);
+
+    // 验证 DB 归档事件依然成功被发布
+    ArgumentCaptor<SearchHistoryRecordEvent> eventCaptor =
+        ArgumentCaptor.forClass(SearchHistoryRecordEvent.class);
+    verify(eventPublisher).publishEvent(eventCaptor.capture());
+    assertThat(eventCaptor.getValue().keyword()).isEqualTo("Fault Tolerance");
+  }
+
+  @Test
+  @DisplayName("获取搜索历史：多租户隔离倒序读取最近条数")
   void testGetHistory() {
     Long userId = 1002L;
+    Long workspaceId = 2L;
     LinkedHashSet<String> mockSet = new LinkedHashSet<>(List.of("RAG", "ES", "Spring"));
-    when(zSetOperations.reverseRange("kf:search:history:1002", 0, 9)).thenReturn(mockSet);
+    when(zSetOperations.reverseRange("kf:search:history:2:1002", 0, 9)).thenReturn(mockSet);
 
-    List<String> history = searchHistoryService.getHistory(userId, 10);
+    List<String> history = searchHistoryService.getHistory(userId, workspaceId, 10);
 
     assertThat(history).containsExactly("RAG", "ES", "Spring");
   }
 
   @Test
-  @DisplayName("删除单条搜索历史：调用 ZREM")
+  @DisplayName("删除单条搜索历史：调用 ZREM 并按工作区隔离")
   void testDeleteSingleHistory() {
     Long userId = 1003L;
-    searchHistoryService.delete(userId, "废弃关键词");
+    Long workspaceId = 1L;
+    searchHistoryService.delete(userId, workspaceId, "废弃关键词");
 
-    verify(zSetOperations).remove("kf:search:history:1003", "废弃关键词");
+    verify(zSetOperations).remove("kf:search:history:1:1003", "废弃关键词");
   }
 
   @Test
-  @DisplayName("清空搜索历史：调用 DEL")
+  @DisplayName("清空搜索历史：调用 DEL 并按工作区隔离")
   void testClearHistory() {
     Long userId = 1004L;
-    searchHistoryService.clear(userId);
+    Long workspaceId = 1L;
+    searchHistoryService.clear(userId, workspaceId);
 
-    verify(stringRedisTemplate).delete("kf:search:history:1004");
+    verify(stringRedisTemplate).delete("kf:search:history:1:1004");
   }
 }

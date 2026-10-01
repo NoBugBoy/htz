@@ -247,4 +247,17 @@ class DocumentSearchSyncListenerTest {
 
     verify(docSearchRepository).save(any());
   }
+
+  @Test
+  @DisplayName("DocumentDeletedEvent 事件：文档被删除时应从 ES 索引中彻底移除")
+  void shouldRemoveFromIndexOnDocumentDeletedEvent() {
+    Long docId = 107L;
+    com.knowflow.application.document.model.event.DocumentDeletedEvent event =
+        new com.knowflow.application.document.model.event.DocumentDeletedEvent(docId, 1L, 10L);
+
+    listener.onDocumentDeleted(event);
+
+    verify(docSearchRepository).deleteById("107");
+    verify(docSearchRepository, never()).save(any());
+  }
 }

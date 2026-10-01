@@ -7,6 +7,7 @@ import com.knowflow.application.document.acl.DocAccessControlService;
 import com.knowflow.application.document.api.dto.DocumentDTO;
 import com.knowflow.application.document.mapper.DocumentMapper;
 import com.knowflow.application.document.model.entity.DocumentEntity;
+import com.knowflow.application.document.model.event.DocumentDeletedEvent;
 import com.knowflow.application.document.model.request.DocumentCreateRequest;
 import com.knowflow.application.document.model.request.DocumentTransitionRequest;
 import com.knowflow.application.document.model.request.DocumentUpdateRequest;
@@ -23,6 +24,7 @@ import com.knowflow.application.exception.BusinessException;
 import java.io.InputStream;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -41,6 +43,7 @@ public class DocumentCommandService {
   private final DocumentStateMachineEngine stateMachineEngine;
   private final DocumentImportPipeline importPipeline;
   private final DocumentMapper documentMapper;
+  private final ApplicationEventPublisher eventPublisher;
 
   /**
    * 手动在线创建 Markdown 文档
@@ -100,7 +103,9 @@ public class DocumentCommandService {
             .orElseThrow(() -> new BusinessException(ErrorCode.Document.DOC_NOT_FOUND, "文档不存在"));
 
     docAccessControlService.assertCanWrite(doc, userId);
+    Long workSpaceId = doc.getWorkSpaceId();
     documentRepository.delete(doc);
+    eventPublisher.publishEvent(new DocumentDeletedEvent(docId, workSpaceId, userId));
     log.info("【DocumentCommandService】文档已删除: id={}, userId={}", docId, userId);
   }
 

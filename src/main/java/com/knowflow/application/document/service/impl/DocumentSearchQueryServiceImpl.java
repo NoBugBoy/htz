@@ -90,7 +90,7 @@ public class DocumentSearchQueryServiceImpl implements DocumentSearchQueryServic
                 b -> {
                   // Must: multi_match 跨多字段全文检索，设置不同字段检索打分权重
                   b.must(
-                      m ->
+                       m ->
                           m.multiMatch(
                               mm ->
                                   mm.query(request.keyword())
@@ -139,11 +139,13 @@ public class DocumentSearchQueryServiceImpl implements DocumentSearchQueryServic
                   return b;
                 }));
 
-    // 2. Highlight: 高亮配置
+    // 2. Highlight: 高亮配置 (配置 fragmentSize，并在 Java 端提供 HTML 标签自闭合安全截断)
     HighlightParameters highlightParameters =
         HighlightParameters.builder()
             .withPreTags("<em class=\"hl\">")
             .withPostTags("</em>")
+            .withNumberOfFragments(1)
+            .withFragmentSize(MAX_SNIPPET_LENGTH)
             .build();
 
     List<HighlightField> highlightFields =
@@ -162,9 +164,10 @@ public class DocumentSearchQueryServiceImpl implements DocumentSearchQueryServic
             ? Sort.by(Sort.Direction.DESC, "publishedAt")
             : Sort.by(Sort.Direction.DESC, "_score");
 
-    // 4. Pagination
+    // 4. Pagination & 精确总命中数
     Pageable pageable = PageRequest.of(request.pageNum() - 1, request.pageSize(), sort);
     builder.withPageable(pageable);
+    builder.withTrackTotalHits(true);
 
     return builder.build();
   }
@@ -197,28 +200,28 @@ public class DocumentSearchQueryServiceImpl implements DocumentSearchQueryServic
     // 优先 1: rawText 高亮
     List<String> rawTextHl = hlMap.get("rawText");
     if (rawTextHl != null && !rawTextHl.isEmpty()) {
-      return truncate(String.join(" ... ", rawTextHl), MAX_SNIPPET_LENGTH);
+      return safeTruncateHtml(String.join(" ... ", rawTextHl), MAX_SNIPPET_LENGTH);
     }
 
     // 优先 2: content 高亮
     List<String> contentHl = hlMap.get("content");
     if (contentHl != null && !contentHl.isEmpty()) {
-      return truncate(String.join(" ... ", contentHl), MAX_SNIPPET_LENGTH);
+      return safeTruncateHtml(String.join(" ... ", contentHl), MAX_SNIPPET_LENGTH);
     }
 
     // 优先 3: 回退到 summary
     if (StrUtil.isNotBlank(doc.getSummary())) {
-      return truncate(doc.getSummary(), MAX_SNIPPET_LENGTH);
+      return safeTruncateHtml(doc.getSummary(), MAX_SNIPPET_LENGTH);
     }
 
     // 优先 4: 回退到 rawText 原文
     if (StrUtil.isNotBlank(doc.getRawText())) {
-      return truncate(doc.getRawText(), MAX_SNIPPET_LENGTH);
+      return safeTruncateHtml(doc.getRawText(), MAX_SNIPPET_LENGTH);
     }
 
     // 优先 5: 回退到 Markdown content
     if (StrUtil.isNotBlank(doc.getContent())) {
-      return truncate(doc.getContent(), MAX_SNIPPET_LENGTH);
+      return safeTruncateHtml(doc.getContent(), MAX_SNIPPET_LENGTH);
     }
 
     return "";
@@ -233,14 +236,37 @@ public class DocumentSearchQueryServiceImpl implements DocumentSearchQueryServic
     return defaultValue != null ? defaultValue : "";
   }
 
-  private String truncate(String text, int maxLength) {
+  /**
+   * 安全截断文本，确保 HTML 高亮标签（如 {@code <em class="hl">} 与 {@code </em>}）完整闭合，
+   * 避免破坏前端 DOM 结构与页面文本样式。
+   */
+  private String safeTruncateHtml(String text, int maxLength) {
     if (text == null) {
       return "";
     }
     if (text.length() <= maxLength) {
       return text;
     }
-    return text.substring(0, maxLength) + "...";
+
+    String truncated = text.substring(0, maxLength);
+
+    // 若恰好截断在 HTML 标签内部 (如 <em cl...)，回退到标签开始符号之前
+    int lastOpenBracket = truncated.lastIndexOf('<');
+    int lastCloseBracket = truncated.lastIndexOf('>');
+    if (lastOpenBracket > lastCloseBracket) {
+      truncated = truncated.substring(0, lastOpenBracket);
+    }
+
+    // 检查 <em class="hl"> 与 </em> 的出现次数，若标签未闭合则自动追加 </em>
+    int openCount = StrUtil.count(truncated, "<em class=\"hl\">");
+    int closeCount = StrUtil.count(truncated, "</em>");
+
+    StringBuilder sb = new StringBuilder(truncated).append("...");
+    for (int i = 0; i < openCount - closeCount; i++) {
+      sb.append("</em>");
+    }
+
+    return sb.toString();
   }
 
   private void recordSearchHistoryAsync(DocumentSearchRequest request) {

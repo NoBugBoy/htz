@@ -161,9 +161,9 @@ class DocumentSearchControllerTest {
   }
 
   @Test
-  @DisplayName("GET /api/search/history - 获取用户搜索历史成功")
+  @DisplayName("GET /api/search/history - 获取用户搜索历史成功并传递 workspaceId")
   void testGetHistory_Success() throws Exception {
-    when(searchHistoryService.getHistory(TEST_USER_ID, 10))
+    when(searchHistoryService.getHistory(TEST_USER_ID, 1L, 10))
         .thenReturn(List.of("Java 25", "Spring Boot 4", "Elasticsearch"));
 
     mockMvc
@@ -174,13 +174,13 @@ class DocumentSearchControllerTest {
         .andExpect(jsonPath("$[1]", is("Spring Boot 4")))
         .andExpect(jsonPath("$[2]", is("Elasticsearch")));
 
-    verify(searchHistoryService).getHistory(TEST_USER_ID, 10);
+    verify(searchHistoryService).getHistory(TEST_USER_ID, 1L, 10);
   }
 
   @Test
   @DisplayName("GET /api/search/history - 自定义 size 参数生效")
   void testGetHistory_CustomSize() throws Exception {
-    when(searchHistoryService.getHistory(TEST_USER_ID, 5))
+    when(searchHistoryService.getHistory(TEST_USER_ID, null, 5))
         .thenReturn(List.of("Java 25", "Spring Boot 4"));
 
     mockMvc
@@ -188,26 +188,39 @@ class DocumentSearchControllerTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$", hasSize(2)));
 
-    verify(searchHistoryService).getHistory(TEST_USER_ID, 5);
+    verify(searchHistoryService).getHistory(TEST_USER_ID, null, 5);
   }
 
   @Test
-  @DisplayName("DELETE /api/search/history/{keyword} - 删除单条搜索历史成功")
+  @DisplayName("DELETE /api/search/history - QueryParam 删除单条搜索历史（支持特殊字符如 C++）")
+  void testDeleteHistory_QueryParam_Success() throws Exception {
+    mockMvc
+        .perform(
+            delete("/api/search/history")
+                .param("workspaceId", "1")
+                .param("keyword", "C++ & CI/CD"))
+        .andExpect(status().isOk());
+
+    verify(searchHistoryService).delete(TEST_USER_ID, 1L, "C++ & CI/CD");
+  }
+
+  @Test
+  @DisplayName("DELETE /api/search/history/{keyword} - 路径参数删除单条搜索历史兼容性")
   void testDeleteHistoryItem_Success() throws Exception {
     mockMvc
-        .perform(delete("/api/search/history/{keyword}", "Elasticsearch"))
+        .perform(delete("/api/search/history/{keyword}", "Elasticsearch").param("workspaceId", "1"))
         .andExpect(status().isOk());
 
-    verify(searchHistoryService).delete(TEST_USER_ID, "Elasticsearch");
+    verify(searchHistoryService).delete(TEST_USER_ID, 1L, "Elasticsearch");
   }
 
   @Test
-  @DisplayName("DELETE /api/search/history - 清空当前用户搜索历史成功")
+  @DisplayName("DELETE /api/search/history - 清空当前用户工作区搜索历史成功")
   void testClearHistory_Success() throws Exception {
     mockMvc
-        .perform(delete("/api/search/history"))
+        .perform(delete("/api/search/history").param("workspaceId", "1"))
         .andExpect(status().isOk());
 
-    verify(searchHistoryService).clear(TEST_USER_ID);
+    verify(searchHistoryService).clear(TEST_USER_ID, 1L);
   }
 }

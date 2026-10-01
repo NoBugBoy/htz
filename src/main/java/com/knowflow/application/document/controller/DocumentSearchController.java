@@ -1,5 +1,6 @@
 package com.knowflow.application.document.controller;
 
+import cn.hutool.core.util.StrUtil;
 import com.knowflow.application.common.SecurityHolder;
 import com.knowflow.application.document.search.dto.DocumentSearchRequest;
 import com.knowflow.application.document.search.dto.DocumentSearchResponse;
@@ -47,7 +48,7 @@ public class DocumentSearchController {
   }
 
   /**
-   * 搜索建议自动补全接口：基于 Completion Suggester 与前缀匹配提供候选词
+   * 搜索建议自动补全接口：基于前缀匹配与租户隔离提供候选词
    *
    * @param workspaceId 工作区ID
    * @param keyword 前缀关键词
@@ -63,7 +64,7 @@ public class DocumentSearchController {
   /**
    * 查询当前用户最近搜索历史接口
    *
-   * @param workspaceId 工作区ID (可选)
+   * @param workspaceId 工作区ID (可选，多租户隔离)
    * @param size 获取条数 (默认 10 条)
    * @return 搜索历史关键词列表 (倒序排列)
    */
@@ -72,26 +73,39 @@ public class DocumentSearchController {
       @RequestParam(value = "workspaceId", required = false) Long workspaceId,
       @RequestParam(value = "size", defaultValue = "10") int size) {
     Long userId = SecurityHolder.getUserId();
-    return searchHistoryService.getHistory(userId, size);
+    return searchHistoryService.getHistory(userId, workspaceId, size);
   }
 
   /**
-   * 删除当前用户单条搜索历史记录
+   * 删除单条搜索历史记录（支持 QueryParam 传参，避免特殊字符在 PathVariable 中被拦截）
+   * 若未指定 keyword 则执行清空
    *
-   * @param keyword 待删除的搜索关键词
-   */
-  @DeleteMapping("/history/{keyword}")
-  public void deleteHistory(@PathVariable("keyword") String keyword) {
-    Long userId = SecurityHolder.getUserId();
-    searchHistoryService.delete(userId, keyword);
-  }
-
-  /**
-   * 清空当前用户全部搜索历史记录
+   * @param workspaceId 工作区ID (可选)
+   * @param keyword 待删除关键词 (可选)
    */
   @DeleteMapping("/history")
-  public void clearHistory() {
+  public void deleteHistory(
+      @RequestParam(value = "workspaceId", required = false) Long workspaceId,
+      @RequestParam(value = "keyword", required = false) String keyword) {
     Long userId = SecurityHolder.getUserId();
-    searchHistoryService.clear(userId);
+    if (StrUtil.isNotBlank(keyword)) {
+      searchHistoryService.delete(userId, workspaceId, keyword);
+    } else {
+      searchHistoryService.clear(userId, workspaceId);
+    }
+  }
+
+  /**
+   * 兼容原有按路径参数删除单条历史记录
+   *
+   * @param keyword 待删除关键词
+   * @param workspaceId 工作区ID (可选)
+   */
+  @DeleteMapping("/history/{keyword}")
+  public void deleteHistoryPath(
+      @PathVariable("keyword") String keyword,
+      @RequestParam(value = "workspaceId", required = false) Long workspaceId) {
+    Long userId = SecurityHolder.getUserId();
+    searchHistoryService.delete(userId, workspaceId, keyword);
   }
 }
